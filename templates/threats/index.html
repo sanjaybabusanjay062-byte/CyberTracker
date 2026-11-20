@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Automated Threat Detection &amp; Heuristic Alert Triage{% endblock %}
+{% block breadcrumb %}Threat Detection{% endblock %}
+
+{% block content %}
+<div class="threats-page-container">
+
+  <!-- Header -->
+  <div class="page-header-row mb-3">
+    <div class="page-header-titles">
+      <h1 class="page-title">Automated Threat Detection</h1>
+      <p class="page-subtitle">Heuristic correlation engine matching ATT&amp;CK tactics, abnormal persistence, credential dumps, and lateral sweeps.</p>
+    </div>
+    <div class="page-header-actions">
+      <!-- Run Threat Scan Control -->
+      <div class="scan-trigger-bar">
+        <select class="form-select form-select-sm" id="scanCaseSelector">
+          <option value="">Select Case to Scan...</option>
+        </select>
+        <button class="btn btn-primary btn-sm" id="runThreatScanBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+          <span>Run Threat Scan</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Cards Row: 4 Metric Cards -->
+  <section class="stats-grid mb-4" aria-label="Threat Telemetry Summary">
+    <div class="stat-card">
+      <div class="stat-card-inner">
+        <div class="stat-header">
+          <span class="stat-label">Total Triggered Alerts</span>
+          <div class="stat-icon-wrapper cyan">⚠️</div>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value" id="threatStatTotal">--</div>
+          <div class="stat-trend neutral"><span>Heuristic &amp; rule detections</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-card-inner">
+        <div class="stat-header">
+          <span class="stat-label">Critical Tier (P1)</span>
+          <div class="stat-icon-wrapper red">🚨</div>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value text-red" id="threatStatCritical">--</div>
+          <div class="stat-trend danger"><span>Active exploit signals</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-card-inner">
+        <div class="stat-header">
+          <span class="stat-label">High Tier (P2)</span>
+          <div class="stat-icon-wrapper orange">⚡</div>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value text-orange" id="threatStatHigh">--</div>
+          <div class="stat-trend warning"><span>Suspicious anomalies</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-card-inner">
+        <div class="stat-header">
+          <span class="stat-label">Under Investigation</span>
+          <div class="stat-icon-wrapper blue">🔍</div>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value text-cyan" id="threatStatInvestigating">--</div>
+          <div class="stat-trend positive"><span>Assigned to investigators</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Threat Alerts Management Panel -->
+  <section class="panel-card">
+    <div class="card-header">
+      <div class="card-title-group">
+        <h2 class="card-title">Security Alert Incident Queue</h2>
+        <span class="card-subtitle">Triaged threat detections requiring analyst review or remediation</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-secondary btn-sm" id="refreshThreatsBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="table-filter-bar">
+      <div class="filter-group">
+        <label for="filterThreatCase">Case:</label>
+        <select id="filterThreatCase" class="filter-select">
+          <option value="">All Cases</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterThreatType">Threat Category:</label>
+        <select id="filterThreatType" class="filter-select">
+          <option value="">All Categories</option>
+          <option value="brute_force">Brute Force</option>
+          <option value="off_hours_access">Off-Hours Access</option>
+          <option value="unusual_ip">Unusual IP Ingress</option>
+          <option value="privilege_escalation">Privilege Escalation</option>
+          <option value="data_exfiltration">Data Exfiltration</option>
+          <option value="suspicious_process">Suspicious Process</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterThreatSeverity">Severity:</label>
+        <select id="filterThreatSeverity" class="filter-select">
+          <option value="">All Severities</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterThreatStatus">Status:</label>
+        <select id="filterThreatStatus" class="filter-select">
+          <option value="">All Statuses</option>
+          <option value="new">New / Unhandled</option>
+          <option value="investigating">Investigating</option>
+          <option value="resolved">Resolved</option>
+          <option value="false_positive">False Positive</option>
+        </select>
+      </div>
+
+      <div class="filter-search-box">
+        <input type="text" id="threatSearchInput" placeholder="Filter by IP, user, or IOC text..." class="filter-input">
+      </div>
+    </div>
+
+    <!-- Threat Alerts Table -->
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="cyber-table" id="threatsTable">
+          <thead>
+            <tr>
+              <th style="width: 110px;">Alert ID</th>
+              <th style="width: 170px;">Threat Category</th>
+              <th style="width: 110px;">Severity</th>
+              <th>Description &amp; Observed Indicator</th>
+              <th style="width: 140px;">Source IP</th>
+              <th style="width: 130px;">User</th>
+              <th style="width: 150px;">Detected Time</th>
+              <th style="width: 130px;">Status</th>
+              <th style="width: 190px; text-align: right;">SOC Triage</th>
+            </tr>
+          </thead>
+          <tbody id="threatsTableBody">
+            <tr>
+              <td colspan="9" class="table-empty-cell">
+                <div class="table-loader-state">
+                  <span class="inline-spinner"></span>
+                  <span>Scanning threat alerts repository...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/threats.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Attack Reconstruction Graph &amp; Killchain Topology{% endblock %}
+{% block breadcrumb %}Attack Graph{% endblock %}
+
+{% block content %}
+<div class="graph-page-container">
+
+  <!-- Header -->
+  <div class="page-header-row mb-3">
+    <div class="page-header-titles">
+      <h1 class="page-title">Attack Reconstruction Graph</h1>
+      <p class="page-subtitle">Interactive visual topology mapping adversarial pivoting, compromised credentials, lateral targets, and C2 beacons.</p>
+    </div>
+    <div class="page-header-actions">
+      <div class="case-select-wrapper">
+        <label for="graphCaseSelector" class="form-label-inline">Active Docket:</label>
+        <select class="form-select form-select-sm" id="graphCaseSelector">
+          <option value="">Select Incident Docket...</option>
+        </select>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="refreshGraphBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6"></path>
+          <path d="M1 20v-6h6"></path>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>Recompute Graph</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Attack Graph Workspace -->
+  <div class="graph-layout-grid">
+    
+    <!-- Canvas Wrapper (Left / Center) -->
+    <div class="panel-card graph-canvas-panel">
+      
+      <!-- Toolbar Controls -->
+      <div class="graph-toolbar">
+        <div class="toolbar-left">
+          <div class="btn-group">
+            <button class="btn btn-secondary btn-xs" id="graphZoomInBtn" title="Zoom In (+)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <line x1="11" y1="8" x2="11" y2="14"></line>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+              </svg>
+            </button>
+            <button class="btn btn-secondary btn-xs" id="graphZoomOutBtn" title="Zoom Out (-)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <line x1="8" y1="11" x2="14" y2="11"></line>
+              </svg>
+            </button>
+            <button class="btn btn-secondary btn-xs" id="graphResetBtn" title="Reset Viewport">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                <path d="M3 3v5h5"></path>
+              </svg>
+              <span>Reset</span>
+            </button>
+          </div>
+          <button class="btn btn-secondary btn-xs" id="graphToggleLabelsBtn" title="Toggle Label Visibility">
+            <span id="labelToggleText">Labels: On</span>
+          </button>
+        </div>
+
+        <div class="toolbar-right">
+          <div class="graph-status-tag" id="graphMetaStats">
+            <span>Nodes: <strong id="nodeCountText">0</strong></span>
+            <span class="sep">•</span>
+            <span>Edges: <strong id="edgeCountText">0</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canvas Element -->
+      <div class="canvas-viewport-container" id="canvasContainer">
+        <canvas id="attackGraphCanvas" width="960" height="600"></canvas>
+
+        <!-- Canvas Overlay Watermark / Tip -->
+        <div class="canvas-tip-overlay">
+          <span>Drag to Pan • Wheel to Zoom • Click Node for Forensics</span>
+        </div>
+      </div>
+
+      <!-- Graph Legend Bar -->
+      <div class="graph-legend-bar">
+        <div class="legend-group">
+          <span class="legend-heading">NODES:</span>
+          <span class="legend-pill"><span class="legend-symbol sym-ip">●</span> IP Address</span>
+          <span class="legend-pill"><span class="legend-symbol sym-user">■</span> User Account</span>
+          <span class="legend-pill"><span class="legend-symbol sym-sys">◆</span> Host / System</span>
+          <span class="legend-pill"><span class="legend-symbol sym-event">▲</span> Threat Event</span>
+        </div>
+        <div class="legend-group">
+          <span class="legend-heading">EDGES:</span>
+          <span class="legend-pill"><span class="legend-line line-confirmed"></span> Confirmed</span>
+          <span class="legend-pill"><span class="legend-line line-inferred"></span> Inferred (Dashed)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inspector / Info Panel (Right, 320px) -->
+    <div class="panel-card graph-info-panel" id="nodeInfoPanel">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2 class="card-title">Entity Telemetry Inspector</h2>
+          <span class="card-subtitle">Click any node or vertex to inspect forensic attributes</span>
+        </div>
+      </div>
+      <div class="card-body" id="nodeInfoBody">
+        <div class="node-info-empty" id="nodeInfoEmpty">
+          <div class="inspector-icon">🎯</div>
+          <h4>No Entity Selected</h4>
+          <p>Click on any node in the canvas to examine associated IOCs, authentication trails, and threat scores.</p>
+        </div>
+
+        <div class="node-info-content" id="nodeInfoContent" style="display: none;">
+          <div class="entity-header-badge" id="infoEntityTypeBadge">IP ADDRESS</div>
+          <h3 class="entity-title" id="infoEntityLabel">192.168.1.105</h3>
+          
+          <div class="entity-details-table">
+            <div class="e-row">
+              <span class="e-key">Node Type:</span>
+              <span class="e-val" id="infoNodeType">IP</span>
+            </div>
+            <div class="e-row">
+              <span class="e-key">Threat Status:</span>
+              <span class="e-val" id="infoNodeThreat">High Risk</span>
+            </div>
+            <div class="e-row">
+              <span class="e-key">First Seen:</span>
+              <span class="e-val" id="infoNodeFirstSeen">--</span>
+            </div>
+            <div class="e-row">
+              <span class="e-key">Connected Edges:</span>
+              <span class="e-val" id="infoNodeDegree">--</span>
+            </div>
+          </div>
+
+          <div class="entity-notes-section">
+            <span class="detail-label">Forensic Synopsis:</span>
+            <p class="entity-synopsis-text" id="infoNodeDescription">Source of repeated failed SSH authentication followed by lateral privilege escalation to backup service account.</p>
+          </div>
+
+          <div class="entity-actions-group">
+            <button class="btn btn-primary btn-block btn-sm" id="btnFilterLogsForNode">Filter Logs for Entity</button>
+            <button class="btn btn-secondary btn-block btn-sm" id="btnAskAiAboutNode">Query AI Copilot</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Graph Footer Disclaimer -->
+      <div class="card-footer disclaimer-footer">
+        <span>* Dashed edges represent probabilistic relationships inferred by AI correlation algorithms.</span>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/attack_graph.js') }}"></script>
+{% endblock %}

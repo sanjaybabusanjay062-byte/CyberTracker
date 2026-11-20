@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Evidence Vault &amp; Chain of Custody{% endblock %}
+{% block breadcrumb %}Evidence Management{% endblock %}
+
+{% block content %}
+<div class="evidence-page-container">
+
+  <!-- Header -->
+  <div class="page-header-row">
+    <div class="page-header-titles">
+      <h1 class="page-title">Digital Evidence Vault</h1>
+      <p class="page-subtitle">Cryptographically verified forensic artifact intake, SHA-256 hashing, and automated parser staging.</p>
+    </div>
+    <div class="page-header-actions">
+      <span class="chain-custody-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+        </svg>
+        <span>Chain of Custody: NIST SP 800-86 Enforced</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Intake / Upload Section -->
+  <section class="panel-card mb-4" id="evidenceUploadPanel">
+    <div class="card-header">
+      <div class="card-title-group">
+        <h2 class="card-title">Evidence Acquisition &amp; Ingestion</h2>
+        <span class="card-subtitle">Select parent case, attach forensic image or log stream, and generate immutable SHA-256 hash</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <form id="evidenceUploadForm" class="evidence-upload-form" enctype="multipart/form-data">
+        <div class="upload-grid">
+          
+          <!-- Left: Dropzone -->
+          <div class="dropzone-column">
+            <div class="cyber-dropzone" id="evidenceDropzone">
+              <input type="file" id="evidenceFileInput" name="file" class="dropzone-file-input" required>
+              <div class="dropzone-content" id="dropzonePrompt">
+                <div class="dropzone-icon">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                </div>
+                <div class="dropzone-text">
+                  <span class="primary-text">Drag &amp; drop forensic files here, or <span class="highlight">browse files</span></span>
+                  <span class="secondary-text">Supported: .pcap, .evtx, .log, .raw, .dd, .json, .csv, .pcapng (Max 2GB per file)</span>
+                </div>
+              </div>
+
+              <!-- Selected File Preview -->
+              <div class="file-preview-card" id="filePreviewCard" style="display: none;">
+                <div class="preview-icon">🗂️</div>
+                <div class="preview-meta">
+                  <span class="preview-name" id="previewFileName">filename.evtx</span>
+                  <span class="preview-size" id="previewFileSize">0 MB</span>
+                </div>
+                <button type="button" class="preview-remove-btn" id="removeSelectedFileBtn" title="Remove file">&times;</button>
+              </div>
+            </div>
+
+            <!-- Upload Progress Bar -->
+            <div class="upload-progress-wrapper" id="uploadProgressWrapper" style="display: none;">
+              <div class="progress-info-row">
+                <span class="progress-status-text" id="uploadProgressText">Hashing &amp; Encrypting: 0%</span>
+                <span class="progress-percent" id="uploadProgressPercent">0%</span>
+              </div>
+              <div class="cyber-progress-track">
+                <div class="cyber-progress-bar" id="uploadProgressBar" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Metadata & Submission -->
+          <div class="upload-meta-column">
+            <div class="form-group">
+              <label class="form-label" for="evidenceCaseSelector">Associate with Incident Case <span class="text-red">*</span></label>
+              <select class="form-select" id="evidenceCaseSelector" name="case_id" required>
+                <option value="" disabled selected>Select an open incident case...</option>
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="evidenceTypeSelector">Evidence Source Classification</label>
+              <select class="form-select" id="evidenceTypeSelector" name="evidence_type">
+                <option value="network_pcap">Network Capture (PCAP/PCAPNG)</option>
+                <option value="windows_evtx" selected>Windows Security Events (EVTX)</option>
+                <option value="linux_syslog">Linux Syslog / Auth Log</option>
+                <option value="web_access">Web Server Access Log (Nginx/Apache)</option>
+                <option value="memory_dump">Memory Dump / Volatility Image</option>
+                <option value="edr_telemetry">EDR / Sysmon JSON Telemetry</option>
+                <option value="disk_image">Forensic Disk Image (E01/DD)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="evidenceDescription">Chain of Custody Notes &amp; Acquisition Source</label>
+              <textarea class="form-textarea" id="evidenceDescription" name="description" rows="3" placeholder="Acquired from DC-01 by Agent J. Miller at 03:14 UTC. Write-blocker active..."></textarea>
+            </div>
+
+            <div class="upload-actions">
+              <button type="submit" class="btn btn-primary btn-block" id="uploadSubmitBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <span>Upload &amp; Calculate SHA-256</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- Evidence Management Table Section -->
+  <section class="panel-card">
+    <div class="card-header">
+      <div class="card-title-group">
+        <h2 class="card-title">Ingested Forensic Artifacts</h2>
+        <span class="card-subtitle">Cryptographic custody status, parser extraction readiness, and hash verification</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-secondary btn-sm" id="refreshEvidenceBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M1 20v-6h6"></path>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="table-filter-bar">
+      <div class="filter-group">
+        <label for="filterCase">Case:</label>
+        <select id="filterCase" class="filter-select">
+          <option value="">All Cases</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterType">Artifact Type:</label>
+        <select id="filterType" class="filter-select">
+          <option value="">All Types</option>
+          <option value="pcap">PCAP</option>
+          <option value="evtx">EVTX</option>
+          <option value="syslog">Syslog</option>
+          <option value="json">EDR/JSON</option>
+          <option value="csv">CSV</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterStatus">Integrity Status:</label>
+        <select id="filterStatus" class="filter-select">
+          <option value="">All Statuses</option>
+          <option value="verified">Verified (Green)</option>
+          <option value="modified">Modified (Alert)</option>
+          <option value="pending">Pending Validation</option>
+        </select>
+      </div>
+
+      <div class="filter-search-box">
+        <input type="text" id="evidenceSearchInput" placeholder="Filter by filename or hash..." class="filter-input">
+      </div>
+    </div>
+
+    <!-- Evidence Table -->
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="cyber-table" id="evidenceTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Artifact Filename</th>
+              <th>Case Docket</th>
+              <th>SHA-256 Hash</th>
+              <th>Size</th>
+              <th>Ingested</th>
+              <th>Integrity</th>
+              <th class="text-right">Forensic Actions</th>
+            </tr>
+          </thead>
+          <tbody id="evidenceTableBody">
+            <tr>
+              <td colspan="8" class="table-empty-cell">
+                <div class="table-loader-state">
+                  <span class="inline-spinner"></span>
+                  <span>Scanning evidence repository...</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Evidence Detail Modal -->
+<div class="modal-overlay" id="evidenceDetailModal" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title" id="modalFileName">Artifact Inspection</h3>
+          <span class="modal-badge-id" id="modalEvidenceId">EVID-000</span>
+        </div>
+        <button class="modal-close-btn" id="closeDetailModalBtn">&times;</button>
+      </div>
+      <div class="modal-body" id="evidenceDetailBody">
+        <div class="modal-detail-grid">
+          <div class="detail-block">
+            <span class="detail-label">Full Cryptographic SHA-256</span>
+            <div class="hash-display-box">
+              <code class="hash-code" id="modalFullHash">Calculating...</code>
+              <button class="copy-icon-btn" id="copyHashBtn" title="Copy SHA-256">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="detail-row-2col">
+            <div class="detail-block">
+              <span class="detail-label">Associated Case</span>
+              <span class="detail-value" id="modalCaseTitle">--</span>
+            </div>
+            <div class="detail-block">
+              <span class="detail-label">File Size &amp; Records</span>
+              <span class="detail-value" id="modalFileSize">--</span>
+            </div>
+          </div>
+
+          <div class="detail-row-2col">
+            <div class="detail-block">
+              <span class="detail-label">Acquired By</span>
+              <span class="detail-value" id="modalUploader">--</span>
+            </div>
+            <div class="detail-block">
+              <span class="detail-label">Timestamp of Intake</span>
+              <span class="detail-value" id="modalUploadDate">--</span>
+            </div>
+          </div>
+
+          <div class="detail-block">
+            <span class="detail-label">Chain of Custody &amp; Investigator Notes</span>
+            <div class="detail-text-box" id="modalDescription">No additional notes provided.</div>
+          </div>
+
+          <div class="detail-block">
+            <span class="detail-label">Integrity Verification Audit Log</span>
+            <div class="audit-history-box" id="modalAuditHistory">
+              <div class="audit-entry">
+                <span class="audit-time">Just now</span>
+                <span class="audit-status verified">NIST SP 800-88 Verification Passed - Hash Matches Baseline</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="closeDetailFooterBtn">Close</button>
+        <button type="button" class="btn btn-primary" id="modalAnalyzeBtn">Run Deep Parser Analysis</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/evidence.js') }}"></script>
+{% endblock %}

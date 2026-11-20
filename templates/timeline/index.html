@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Incident Timeline &amp; Attack Sequence Reconstruction{% endblock %}
+{% block breadcrumb %}Incident Timeline{% endblock %}
+
+{% block content %}
+<div class="timeline-page-container">
+
+  <!-- Header -->
+  <div class="page-header-row mb-3">
+    <div class="page-header-titles">
+      <h1 class="page-title">Chronological Attack Reconstruction</h1>
+      <p class="page-subtitle">Unified multi-source forensic timeline ordering ingress vectors, lateral movement, and data exfiltration.</p>
+    </div>
+    <div class="page-header-actions">
+      <!-- Zoom / View controls -->
+      <div class="timeline-view-toggles">
+        <button class="btn btn-secondary btn-sm" id="zoomInTimelineBtn" title="Expand time density">
+          <span>Zoom +</span>
+        </button>
+        <button class="btn btn-secondary btn-sm" id="zoomOutTimelineBtn" title="Compress time density">
+          <span>Zoom &minus;</span>
+        </button>
+      </div>
+      <button class="btn btn-primary btn-sm" id="exportTimelineBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Export Timeline</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <section class="panel-card mb-4" id="timelineFilterCard">
+    <div class="card-body py-3">
+      <form id="timelineFilterForm" class="filter-bar-row">
+        
+        <div class="filter-item">
+          <label for="timelineCaseSelect" class="filter-label">Case:</label>
+          <select id="timelineCaseSelect" class="filter-select">
+            <option value="">All Active Cases</option>
+          </select>
+        </div>
+
+        <div class="filter-item">
+          <label for="timelineSeveritySelect" class="filter-label">Severity:</label>
+          <select id="timelineSeveritySelect" class="filter-select">
+            <option value="">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="info">Informational</option>
+          </select>
+        </div>
+
+        <div class="filter-item">
+          <label for="timelineEventTypeSelect" class="filter-label">Event Type:</label>
+          <select id="timelineEventTypeSelect" class="filter-select">
+            <option value="">All Types</option>
+            <option value="login_failure">Failed Logins</option>
+            <option value="privilege_escalation">Privilege Escalation</option>
+            <option value="process_creation">Process Spawning</option>
+            <option value="network_connection">C2 / Net Connections</option>
+            <option value="data_exfiltration">Exfiltration</option>
+          </select>
+        </div>
+
+        <div class="filter-item">
+          <label for="timelineDateRange" class="filter-label">Range:</label>
+          <select id="timelineDateRange" class="filter-select">
+            <option value="">Complete Incident</option>
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+          </select>
+        </div>
+
+        <div class="filter-item flex-grow">
+          <input type="text" id="timelineSearchInput" class="filter-input" placeholder="Search event text, IP, or user...">
+        </div>
+
+        <button type="submit" class="btn btn-secondary btn-sm" id="applyTimelineFiltersBtn">Filter</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Timeline Body -->
+  <section class="panel-card timeline-card">
+    <div class="card-header">
+      <div class="card-title-group">
+        <h2 class="card-title">Event Sequence Trace</h2>
+        <span class="card-subtitle" id="timelineStatsBadge">Loading sequence telemetry...</span>
+      </div>
+      <div class="card-actions">
+        <!-- Severity legend -->
+        <div class="severity-legend-badges">
+          <span class="sev-legend-item"><span class="dot dot-critical"></span> Critical</span>
+          <span class="sev-legend-item"><span class="dot dot-high"></span> High</span>
+          <span class="sev-legend-item"><span class="dot dot-medium"></span> Medium</span>
+          <span class="sev-legend-item"><span class="dot dot-low"></span> Low</span>
+          <span class="sev-legend-item"><span class="dot dot-info"></span> Info</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <!-- Loading State -->
+      <div class="timeline-loading-box" id="timelineLoading">
+        <span class="inline-spinner"></span>
+        <span>Reconstructing chronological incident events...</span>
+      </div>
+
+      <!-- Empty State -->
+      <div class="timeline-empty-box" id="timelineEmpty" style="display: none;">
+        <div class="empty-icon">📅</div>
+        <h3>No Events Found</h3>
+        <p>No timeline records match the selected filters or no evidence has been indexed for this case.</p>
+      </div>
+
+      <!-- Vertical Timeline Component -->
+      <div class="vertical-timeline" id="verticalTimeline">
+        <!-- Event items populated dynamically via timeline.js -->
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/timeline.js') }}"></script>
+{% endblock %}

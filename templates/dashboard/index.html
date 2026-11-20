@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}SOC Command Center Dashboard{% endblock %}
+{% block breadcrumb %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+  
+  <!-- Dashboard Top Header Bar -->
+  <div class="page-header-row">
+    <div class="page-header-titles">
+      <h1 class="page-title">SOC Command Center</h1>
+      <p class="page-subtitle">Real-time cyber threat intelligence, forensic artifacts, and multi-vector incident metrics.</p>
+    </div>
+    <div class="page-header-actions">
+      <div class="time-range-indicator">
+        <span class="live-pulse-dot"></span>
+        <span class="time-text">Live Enclave Telemetry</span>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="refreshDashboardBtn" title="Force Refresh Telemetry">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6"></path>
+          <path d="M1 20v-6h6"></path>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>Refresh</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats Row: 4 Metric Cards -->
+  <section class="stats-grid" aria-label="Key Forensic Metrics">
+    
+    <!-- Card 1: Total Investigations -->
+    <div class="stat-card" id="statCardCases">
+      <div class="stat-card-glow cyan-glow"></div>
+      <div class="stat-card-inner">
+        <div class="stat-header">
+          <span class="stat-label">Active Investigations</span>
+          <div class="stat-icon-wrapper cyan">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value" id="statTotalCases">--</div>
+          <div class="stat-trend positive" id="trendCases">
+            <span class="trend-icon">↑</span>
+            <span class="trend-text">+3 this week</span>
+          </div>
+        </div>
+        <div class="stat-progress-bar">
+          <div class="progress-fill cyan" style="width: 68%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Evidence Files -->
+    <div class="stat-card" id="statCardEvidence">
+      <div class="stat-card-glow blue-glow"></div>
+      <div class="stat-card-inner">
+        <div class="stat-header">
+          <span class="stat-label">Evidence Artifacts</span>
+          <div class="stat-icon-wrapper blue">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </div>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value" id="statEvidenceFiles">--</div>
+          <div class="stat-trend neutral" id="trendEvidence">
+            <span class="trend-icon">●</span>
+            <span class="trend-text">100% SHA-256 Intact</span>
+          </div>
+        </div>
+        <div class="stat-progress-bar">
+          <div class="progress-fill blue" style="width: 82%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Threat Alerts -->
+    <div class="stat-card" id="statCardThreats">
+      <div class="stat-card-glow orange-glow"></div>
+      <div class="stat-card-inner">
+        <div class="stat-header">
+          <span class="stat-label">Threat Alerts</span>
+          <div class="stat-icon-wrapper orange">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value" id="statThreatAlerts">--</div>
+          <div class="stat-trend warning" id="trendThreats">
+            <span class="trend-icon">↑</span>
+            <span class="trend-text">+12% vs yesterday</span>
+          </div>
+        </div>
+        <div class="stat-progress-bar">
+          <div class="progress-fill orange" style="width: 54%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: Critical Events -->
+    <div class="stat-card" id="statCardCritical">
+      <div class="stat-card-glow red-glow"></div>
+      <div class="stat-card-inner">
+        <div class="stat-header">
+          <span class="stat-label">Critical Severity Events</span>
+          <div class="stat-icon-wrapper red">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+        </div>
+        <div class="stat-body">
+          <div class="stat-value text-red" id="statCriticalEvents">--</div>
+          <div class="stat-trend danger" id="trendCritical">
+            <span class="trend-icon">⚠</span>
+            <span class="trend-text">Requires Immediate Triage</span>
+          </div>
+        </div>
+        <div class="stat-progress-bar">
+          <div class="progress-fill red" style="width: 35%;"></div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Charts Row -->
+  <section class="charts-row">
+    
+    <!-- Left: Threat Severity Distribution (Donut) -->
+    <div class="panel-card chart-card-half">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2 class="card-title">Threat Severity Distribution</h2>
+          <span class="card-subtitle">Active alerts categorized by MITRE ATT&CK risk</span>
+        </div>
+        <div class="card-actions">
+          <span class="status-pill status-pill-cyan" id="donutTotalBadge">Calculated Live</span>
+        </div>
+      </div>
+      <div class="card-body chart-body">
+        <div class="chart-canvas-container donut-wrap">
+          <canvas id="threatSeverityChart"></canvas>
+        </div>
+        <div class="donut-custom-legend" id="donutLegend">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Event Trend (Line Chart, Last 14 Days) -->
+    <div class="panel-card chart-card-half">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2 class="card-title">Telemetry &amp; Event Trend</h2>
+          <span class="card-subtitle">Aggregated ingested forensic log volume (Last 14 Days)</span>
+        </div>
+        <div class="card-actions">
+          <div class="chart-filter-pills">
+            <button class="pill-btn active" data-range="14d">14D</button>
+            <button class="pill-btn" data-range="7d">7D</button>
+            <button class="pill-btn" data-range="24h">24H</button>
+          </div>
+        </div>
+      </div>
+      <div class="card-body chart-body">
+        <div class="chart-canvas-container line-wrap">
+          <canvas id="eventTrendChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Operations Row: Quick Actions + Recent Activity -->
+  <section class="dashboard-split-row">
+    
+    <!-- Recent Activity Table (Left/Main, 65%) -->
+    <div class="panel-card flex-2">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2 class="card-title">Live Forensic Audit &amp; Activity Log</h2>
+          <span class="card-subtitle">Real-time investigator actions, evidence access, and anomaly scans</span>
+        </div>
+        <div class="card-actions">
+          <a href="{{ url_for('logs.index') if 'logs.index' in (url_map or {}) else '/logs' }}" class="card-link">View Deep Logs →</a>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="cyber-table" id="recentActivityTable">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Action</th>
+                <th>Investigator</th>
+                <th>Target Resource</th>
+                <th>Severity</th>
+              </tr>
+            </thead>
+            <tbody id="recentActivityTableBody">
+              <tr>
+                <td colspan="5" class="table-empty-cell">
+                  <div class="table-loader-state">
+                    <span class="inline-spinner"></span>
+                    <span>Retrieving forensic telemetry stream...</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions Panel (Right, 35%) -->
+    <div class="panel-card flex-1">
+      <div class="card-header">
+        <div class="card-title-group">
+          <h2 class="card-title">SOC Quick Actions</h2>
+          <span class="card-subtitle">Direct operational dispatch</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="quick-actions-grid">
+          <button class="action-tile-btn" id="qaNewCaseBtn">
+            <div class="tile-icon cyan">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14"></path>
+              </svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-title">Open New Case</span>
+              <span class="tile-desc">Register an active incident docket</span>
+            </div>
+          </button>
+
+          <a href="{{ url_for('evidence.index') if 'evidence.index' in (url_map or {}) else '/evidence' }}" class="action-tile-btn">
+            <div class="tile-icon blue">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-title">Upload Evidence</span>
+              <span class="tile-desc">PCAP, EVTX, Disk Image, Syslog</span>
+            </div>
+          </a>
+
+          <a href="{{ url_for('threats.index') if 'threats.index' in (url_map or {}) else '/threats' }}" class="action-tile-btn">
+            <div class="tile-icon orange">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="22" y1="12" x2="18" y2="12"></line>
+                <line x1="6" y1="12" x2="2" y2="12"></line>
+                <line x1="12" y1="6" x2="12" y2="2"></line>
+                <line x1="12" y1="22" x2="12" y2="18"></line>
+              </svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-title">Run Threat Scan</span>
+              <span class="tile-desc">Trigger heuristic rule evaluation</span>
+            </div>
+          </a>
+
+          <a href="{{ url_for('reports.index') if 'reports.index' in (url_map or {}) else '/reports' }}" class="action-tile-btn">
+            <div class="tile-icon green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            </div>
+            <div class="tile-content">
+              <span class="tile-title">Generate Report</span>
+              <span class="tile-desc">Court-ready PDF forensics audit</span>
+            </div>
+          </a>
+        </div>
+
+        <div class="soc-health-widget">
+          <div class="health-header">
+            <span class="health-label">ENCLAVE INTEGRITY</span>
+            <span class="health-val text-green">100% OPERATIONAL</span>
+          </div>
+          <div class="health-indicators">
+            <div class="health-bar"><span class="bar-fill green" style="width: 100%;"></span></div>
+            <div class="health-meta">
+              <span>Zero Hash Collisions Detected</span>
+              <span>AES-GCM-256 Vault</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+</div>
+
+<!-- Quick New Case Modal -->
+<div class="modal-overlay" id="quickNewCaseModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Incident Case</h3>
+        <button class="modal-close-btn" id="closeCaseModalBtn">&times;</button>
+      </div>
+      <form id="quickNewCaseForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="qaCaseTitle">Case Title / Incident Tag *</label>
+            <input type="text" class="form-input" id="qaCaseTitle" placeholder="e.g., APT29 Ingress via Edge Gateway" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="qaCasePriority">Initial Priority</label>
+            <select class="form-select" id="qaCasePriority">
+              <option value="critical">Critical (P1)</option>
+              <option value="high" selected>High (P2)</option>
+              <option value="medium">Medium (P3)</option>
+              <option value="low">Low (P4)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="qaCaseDesc">Scope &amp; Incident Synopsis *</label>
+            <textarea class="form-textarea" id="qaCaseDesc" rows="3" placeholder="Brief summary of suspect IOCs, compromised hosts, or trigger vector..." required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cancelCaseModalBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveQuickCaseBtn">Initialize Case</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
