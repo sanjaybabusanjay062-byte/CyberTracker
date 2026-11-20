@@ -1,80 +1,131 @@
-/* CYBERTRACE AI — AI Chat Assistant JavaScript */
+/* CYBERTRACE AI — AI Forensic Investigation Assistant JavaScript */
 
 let sessionId = generateSessionId();
 let isProcessing = false;
 let currentCaseId = null;
-const SUGGESTIONS = [
-  'Who logged into the server between 2–4 AM?',
-  'Show me all failed login attempts',
-  'Which IP addresses appear most suspicious?',
-  'Give me a summary of all threats detected',
-  'Was there any brute force attack detected?',
-  'What files were accessed by admin users?',
-  'Show timeline of events for the past 24 hours',
-  'List all privilege escalation events',
-];
 
 function generateSessionId() {
-  return 'sess-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
+  return 'CT-SESS-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  renderSuggestions();
-  loadCaseSelect();
+  const sessionEl = document.getElementById('chatSessionId');
+  if (sessionEl) sessionEl.textContent = sessionId;
 
-  // Enter to send (Shift+Enter for newline)
-  const input = document.getElementById('chat-input');
-  if (input) {
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
+  loadCaseOptions();
+  loadContextMetrics();
+  initChatForm();
+  initPromptChips();
+
+  const clearBtn = document.getElementById('clearChatBtn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      const area = document.getElementById('chatMessagesArea') || document.getElementById('chat-messages');
+      if (area) {
+        area.innerHTML = `
+          <div class="chat-message assistant-msg">
+            <div class="msg-avatar"><span>AI</span></div>
+            <div class="msg-content-wrapper">
+              <div class="msg-sender-name">CYBERTRACE AI Forensics</div>
+              <div class="msg-bubble">
+                <p>Investigation session reset. Telemetry indexes and cryptographic hashes are ready. What evidence would you like to examine?</p>
+              </div>
+              <div class="msg-timestamp">Session Cleared</div>
+            </div>
+          </div>
+        `;
       }
-      // Auto-resize textarea
-      input.style.height = 'auto';
-      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+      try {
+        await apiRequest(`/api/chat/history/${sessionId}`, 'DELETE');
+      } catch (_) {}
+      sessionId = generateSessionId();
+      if (sessionEl) sessionEl.textContent = sessionId;
+      showNotification('Chat conversation cleared', 'info');
     });
   }
 });
 
-function renderSuggestions() {
-  const container = document.getElementById('suggestions-list');
-  if (!container) return;
-  container.innerHTML = SUGGESTIONS.map(s =>
-    `<button class="suggestion-chip" onclick="useSuggestion(this.textContent)">${escapeHtml(s)}</button>`
-  ).join('');
-}
-
-function useSuggestion(text) {
-  const input = document.getElementById('chat-input');
-  if (input) { input.value = text; input.focus(); }
-}
-
-async function loadCaseSelect() {
+async function loadCaseOptions() {
   try {
-    const data = await apiRequest('/api/cases/list?per_page=50');
-    const sel = document.getElementById('case-selector');
+    const data = await apiRequest('/api/cases/list?per_page=100');
+    const sel = document.getElementById('chatCaseSelect') || document.getElementById('case-selector');
     if (!sel || !data.cases) return;
-    data.cases.forEach(c => {
-      sel.add(new Option(`${c.case_id} — ${c.title.substring(0, 35)}`, c.id));
-    });
-  } catch (e) { console.warn('Case load:', e); }
-}
 
-function onCaseChange() {
-  const sel = document.getElementById('case-selector');
-  currentCaseId = sel?.value || null;
-  const badge = document.getElementById('case-badge');
-  if (badge) {
-    badge.textContent = currentCaseId
-      ? sel.options[sel.selectedIndex].text
-      : 'All Cases';
+    data.cases.forEach(c => {
+      sel.add(new Option(`${c.case_id} — ${c.title.substring(0, 32)}`, c.id));
+    });
+
+    sel.addEventListener('change', () => {
+      currentCaseId = sel.value || null;
+      const label = document.getElementById('groundingCaseLabel');
+      if (label) {
+        label.textContent = currentCaseId ? sel.options[sel.selectedIndex].text : 'All Active Cases';
+      }
+      loadContextMetrics();
+      showNotification(`Forensic grounding updated to: ${label ? label.textContent : 'All Cases'}`, 'info');
+    });
+  } catch (e) {
+    console.error('Failed to load case options for AI:', e);
   }
 }
 
-async function sendMessage() {
+async function loadContextMetrics() {
+  try {
+    const url = '/api/chat/context' + (currentCaseId ? `?case_id=${currentCaseId}` : '');
+    const data = await apiRequest(url);
+
+    const evEl = document.getElementById('ctxEvidenceCount');
+    const logEl = document.getElementById('ctxLogCount');
+    const threatEl = document.getElementById('ctxThreatCount');
+
+    if (evEl) evEl.textContent = data.evidence_count ?? '--';
+    if (logEl) logEl.textContent = data.log_count ?? '--';
+    if (threatEl) threatEl.textContent = data.threat_count ?? '--';
+  } catch (e) {
+    console.warn('Context metrics load error:', e);
+  }
+}
+
+function initChatForm() {
+  const form = document.getElementById('chatForm');
+  const input = document.getElementById('chatInput') || document.getElementById('chat-input');
+
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitQuery();
+      }
+      // Auto-resize textarea
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitQuery();
+    });
+  }
+}
+
+function initPromptChips() {
+  document.querySelectorAll('.prompt-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const q = chip.dataset.query || chip.querySelector('.chip-text')?.textContent?.trim() || chip.textContent?.trim();
+      if (q) {
+        const input = document.getElementById('chatInput') || document.getElementById('chat-input');
+        if (input) input.value = q;
+        submitQuery();
+      }
+    });
+  });
+}
+
+async function submitQuery() {
   if (isProcessing) return;
-  const input = document.getElementById('chat-input');
+  const input = document.getElementById('chatInput') || document.getElementById('chat-input');
   const question = input?.value?.trim();
   if (!question) return;
 
@@ -82,8 +133,9 @@ async function sendMessage() {
   input.value = '';
   input.style.height = 'auto';
 
-  appendMessage('user', question);
-  showTyping();
+  // Append User message
+  appendUserMessage(question);
+  showTyping(true);
 
   try {
     const data = await apiRequest('/api/chat/query', 'POST', {
@@ -91,137 +143,151 @@ async function sendMessage() {
       case_id: currentCaseId,
       session_id: sessionId
     });
-    removeTyping();
+
+    showTyping(false);
     appendAssistantMessage(data);
-    updateSessionInfo();
-  } catch (e) {
-    removeTyping();
-    appendMessage('assistant', `⚠️ Error processing query: ${e.message}. Please try again.`);
+  } catch (err) {
+    showTyping(false);
+    appendAssistantMessage({
+      answer: `### Telemetry Query Notice\n\nUnable to process query at this moment: ${err.message}. Please check that evidence is indexed or try rephrasing your inquiry.`,
+      supporting_records: [],
+      confidence: 0,
+      disclaimer: 'Analysis based on available evidence only.'
+    });
   } finally {
     isProcessing = false;
-    scrollToBottom();
   }
 }
 
-function appendMessage(role, content) {
-  const container = document.getElementById('chat-messages');
-  if (!container) return;
+function appendUserMessage(text) {
+  const area = document.getElementById('chatMessagesArea') || document.getElementById('chat-messages');
+  if (!area) return;
 
-  // Remove welcome screen if present
-  const welcome = document.getElementById('chat-welcome');
-  if (welcome) welcome.remove();
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'chat-message user-msg';
+  const nowStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-  const avatarContent = role === 'user' ? '👤' : '🤖';
-  const timeStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  msgDiv.innerHTML = `
+    <div class="msg-avatar user-avatar">
+      <span>YOU</span>
+    </div>
+    <div class="msg-content-wrapper">
+      <div class="msg-sender-name">Investigator Query</div>
+      <div class="msg-bubble user-bubble">
+        <p>${escapeHtml(text)}</p>
+      </div>
+      <div class="msg-timestamp">${nowStr}</div>
+    </div>
+  `;
 
-  const div = document.createElement('div');
-  div.className = `chat-message ${role}`;
-  div.innerHTML = `
-    <div class="msg-avatar ${role}">${avatarContent}</div>
-    <div>
-      <div class="msg-bubble">${escapeHtml(content)}</div>
-      <div class="msg-time">${timeStr}</div>
-    </div>`;
-  container.appendChild(div);
+  area.appendChild(msgDiv);
   scrollToBottom();
 }
 
 function appendAssistantMessage(data) {
-  const container = document.getElementById('chat-messages');
-  if (!container) return;
+  const area = document.getElementById('chatMessagesArea') || document.getElementById('chat-messages');
+  if (!area) return;
 
-  const timeStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const div = document.createElement('div');
-  div.className = 'chat-message assistant';
+  const msgDiv = document.createElement('div');
+  msgDiv.className = 'chat-message assistant-msg';
+  const nowStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
-  const hasRecords = data.supporting_records && data.supporting_records.length > 0;
-  const recordsHtml = hasRecords ? `
-    <details class="supporting-records">
-      <summary>📊 ${data.supporting_records.length} supporting record${data.supporting_records.length !== 1 ? 's' : ''}</summary>
-      <table class="supporting-table" style="margin-top:.5rem;">
-        <thead><tr><th>Time</th><th>IP</th><th>User</th><th>Event</th><th>Severity</th></tr></thead>
-        <tbody>
-          ${data.supporting_records.slice(0, 15).map(r => `
-            <tr>
-              <td>${formatTimestamp(r.timestamp)?.split(' ').slice(-1)[0] || '—'}</td>
-              <td>${escapeHtml(r.source_ip || '—')}</td>
-              <td>${escapeHtml(r.username || '—')}</td>
-              <td>${escapeHtml(r.event_type || '—')}</td>
-              <td><span class="badge ${getSeverityClass(r.severity)}">${r.severity}</span></td>
-            </tr>`).join('')}
-          ${data.supporting_records.length > 15 ? `<tr><td colspan="5" style="color:var(--text-muted);text-align:center;">…and ${data.supporting_records.length - 15} more</td></tr>` : ''}
-        </tbody>
-      </table>
-    </details>` : '';
+  // Format markdown in answer
+  const formattedAnswer = renderMarkdownAnswer(data.answer || 'No response returned.');
 
-  div.innerHTML = `
-    <div class="msg-avatar assistant">🤖</div>
-    <div style="max-width:85%;">
-      <div class="msg-bubble" style="border-radius:12px 12px 12px 3px;">
-        <div style="white-space:pre-wrap;">${escapeHtml(data.answer)}</div>
-        ${recordsHtml}
-        <div style="margin-top:.6rem;padding-top:.6rem;border-top:1px solid rgba(255,255,255,.08);font-size:.72rem;color:var(--text-muted);">
-          ⚠️ ${escapeHtml(data.disclaimer || 'Analysis based on available evidence only.')}
+  // Supporting evidence records cards
+  let supportingHtml = '';
+  const records = data.supporting_records || [];
+  if (records.length > 0) {
+    supportingHtml = `
+      <div class="supporting-evidence-box">
+        <div class="supporting-header">
+          <span class="supp-icon">🛡️</span>
+          <span>Supporting Evidence Logs (${records.length} Records Verified)</span>
+        </div>
+        <div class="supporting-records-list">
+          ${records.slice(0, 6).map(r => `
+            <div class="supp-record-item">
+              <span class="supp-time">${escapeHtml(formatTimestamp(r.timestamp))}</span>
+              <span class="supp-type badge ${getSeverityClass(r.severity || 'info')}">${escapeHtml(r.event_type || 'event')}</span>
+              <span class="supp-ip code-text">${escapeHtml(r.source_ip || 'Local')}</span>
+              <span class="supp-user">${escapeHtml(r.username || 'system')}</span>
+              <span class="supp-desc">${escapeHtml(r.event_description || r.description || '')}</span>
+            </div>
+          `).join('')}
         </div>
       </div>
-      <div class="msg-time">
-        ${timeStr}
-        ${data.confidence ? `<span style="margin-left:.5rem;color:var(--accent-cyan);">Confidence: ${data.confidence}</span>` : ''}
-      </div>
-    </div>`;
-  container.appendChild(div);
-}
+    `;
+  }
 
-function showTyping() {
-  const container = document.getElementById('chat-messages');
-  if (!container) return;
-  const div = document.createElement('div');
-  div.id = 'typing-indicator';
-  div.className = 'chat-message assistant';
-  div.innerHTML = `
-    <div class="msg-avatar assistant">🤖</div>
-    <div class="msg-bubble" style="padding:.7rem 1rem;border-radius:12px 12px 12px 3px;">
-      <div class="typing-indicator">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <span style="font-size:.75rem;color:var(--text-muted);margin-left:.4rem;">Analyzing evidence…</span>
+  msgDiv.innerHTML = `
+    <div class="msg-avatar">
+      <span>AI</span>
+    </div>
+    <div class="msg-content-wrapper">
+      <div class="msg-sender-name">
+        <span>CYBERTRACE AI Forensics</span>
+        <span class="confidence-tag">Confidence: ${Math.round((data.confidence || 0.95) * 100)}%</span>
       </div>
-    </div>`;
-  container.appendChild(div);
+      <div class="msg-bubble">
+        <div class="ai-formatted-text">${formattedAnswer}</div>
+        ${supportingHtml}
+        <div class="grounding-disclaimer-note">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span>${escapeHtml(data.disclaimer || 'Deterministic grounding active. 0% hallucination tolerance.')}</span>
+        </div>
+      </div>
+      <div class="msg-timestamp">${nowStr}</div>
+    </div>
+  `;
+
+  area.appendChild(msgDiv);
   scrollToBottom();
 }
 
-function removeTyping() {
-  document.getElementById('typing-indicator')?.remove();
+function showTyping(show) {
+  const indicator = document.getElementById('typingIndicator') || document.getElementById('typing-indicator');
+  if (indicator) {
+    indicator.style.display = show ? 'flex' : 'none';
+  }
+  if (show) scrollToBottom();
 }
 
 function scrollToBottom() {
-  const container = document.getElementById('chat-messages');
-  if (container) container.scrollTop = container.scrollHeight;
-}
-
-async function clearConversation() {
-  if (!(await confirmDialog('Clear this conversation? The session history will be deleted.'))) return;
-  try {
-    await apiRequest(`/api/chat/history/${sessionId}`, 'DELETE');
-    sessionId = generateSessionId();
-    const container = document.getElementById('chat-messages');
-    if (container) {
-      container.innerHTML = `<div id="chat-welcome" style="text-align:center;padding:3rem 1rem;color:var(--text-muted);">
-        <div style="font-size:2.5rem;margin-bottom:1rem;">🤖</div>
-        <div style="font-size:1rem;font-weight:600;color:var(--text-secondary);margin-bottom:.5rem;">CYBERTRACE AI Assistant</div>
-        <div style="font-size:.82rem;">Ask me anything about the evidence and investigation</div>
-      </div>`;
-    }
-    updateSessionInfo();
-    showNotification('Conversation cleared', 'info');
-  } catch (e) {
-    showNotification('Failed to clear conversation', 'error');
+  const area = document.getElementById('chatMessagesArea') || document.getElementById('chat-messages');
+  if (area) {
+    setTimeout(() => {
+      area.scrollTop = area.scrollHeight;
+    }, 50);
   }
 }
 
-function updateSessionInfo() {
-  const el = document.getElementById('session-id-display');
-  if (el) el.textContent = sessionId;
+function renderMarkdownAnswer(text) {
+  if (!text) return '';
+  // Basic markdown parser
+  let html = escapeHtml(text);
+
+  // Headers
+  html = html.replace(/^### (.*$)/gim, '<h4 class="ai-heading">$1</h4>');
+  html = html.replace(/^## (.*$)/gim, '<h3 class="ai-heading">$1</h3>');
+  html = html.replace(/^# (.*$)/gim, '<h2 class="ai-heading">$1</h2>');
+
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+  // Italic
+  html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
+  // Inline code
+  html = html.replace(/`(.*?)`/gim, '<code class="inline-code">$1</code>');
+
+  // Bullet items
+  html = html.replace(/^\- (.*$)/gim, '<li class="ai-bullet">$1</li>');
+  html = html.replace(/(<li.*<\/li>)/gim, '<ul class="ai-list">$1</ul>');
+
+  // Line breaks to paragraphs
+  html = html.split('\n\n').map(p => {
+    if (p.startsWith('<h') || p.startsWith('<ul')) return p;
+    return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+
+  return html;
 }

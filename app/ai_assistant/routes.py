@@ -69,6 +69,28 @@ def history(session_id):
     return jsonify({'messages': [m.to_dict() for m in messages]})
 
 
+@ai_bp.route('/api/chat/context')
+@login_required
+def chat_context():
+    case_id = request.args.get('case_id')
+    from app.models import LogRecord, ThreatAlert, Evidence
+    
+    eq = Evidence.query.filter(Evidence.status != 'deleted')
+    lq = LogRecord.query
+    tq = ThreatAlert.query
+    
+    if case_id:
+        eq = eq.filter(Evidence.case_id == int(case_id))
+        lq = lq.filter(LogRecord.case_id == int(case_id))
+        tq = tq.filter(ThreatAlert.case_id == int(case_id))
+        
+    return jsonify({
+        'evidence_count': eq.count(),
+        'log_count': lq.count(),
+        'threat_count': tq.count()
+    })
+
+
 @ai_bp.route('/api/chat/history/<session_id>', methods=['DELETE'])
 @login_required
 def clear_history(session_id):

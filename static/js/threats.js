@@ -1,152 +1,248 @@
-/* CYBERTRACE AI — Threat Detection JavaScript */
+/* CYBERTRACE AI — Automated Threat Detection & Triage JavaScript */
 
+let allAlerts = [];
 let currentPage = 1;
-let threatChart = null;
+let totalPages = 1;
 
 document.addEventListener('DOMContentLoaded', () => {
-  loadThreats(1);
+  loadCaseOptions();
   loadThreatStats();
+  loadThreats(1);
+
+  // Run Threat Scan
+  const scanBtn = document.getElementById('runThreatScanBtn') || document.getElementById('scan-btn');
+  if (scanBtn) {
+    scanBtn.addEventListener('click', runThreatScan);
+  }
+
+  // Refresh
+  const refreshBtn = document.getElementById('refreshThreatsBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      loadThreatStats();
+      loadThreats(currentPage);
+      showNotification('Threat telemetry updated', 'info');
+    });
+  }
+
+  // Filters
+  const filters = ['filterThreatCase', 'filterThreatType', 'filterThreatSeverity', 'filterThreatStatus'];
+  filters.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => loadThreats(1));
+  });
+
+  // Search input debounced
+  const searchInput = document.getElementById('threatSearchInput');
+  if (searchInput) {
+    let timer = null;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => filterThreatsLocally(), 250);
+    });
+  }
 });
 
-async function loadThreats(page = 1) {
-  currentPage = page;
-  const tbody = document.getElementById('threats-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="spinner" style="margin:0 auto;"></div></td></tr>`;
-
+async function loadCaseOptions() {
   try {
-    const params = new URLSearchParams({ page, per_page: 50 });
-    const vals = { case_id: 'filter-case-id', severity: 'filter-severity', alert_type: 'filter-type', status: 'filter-status' };
-    for (const [k, id] of Object.entries(vals)) {
-      const v = document.getElementById(id)?.value;
-      if (v) params.set(k, v);
+    const data = await apiRequest('/api/cases/list?per_page=100');
+    const scanSel = document.getElementById('scanCaseSelector') || document.getElementById('scan-case-id');
+    const filterSel = document.getElementById('filterThreatCase');
+
+    if (data.cases) {
+      data.cases.forEach(c => {
+        const titleStr = `${c.case_id} — ${c.title.substring(0, 36)}`;
+        if (scanSel) scanSel.add(new Option(titleStr, c.id));
+        if (filterSel) filterSel.add(new Option(titleStr, c.id));
+      });
     }
-
-    const data = await apiRequest('/api/threats/list?' + params.toString());
-    if (!data.alerts || data.alerts.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><div class="empty-icon">🛡️</div><div>No threat alerts found</div><div style="font-size:.8rem;color:var(--text-muted);margin-top:.3rem;">Run a threat scan on a case to detect suspicious activity</div></td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.alerts.map(a => `
-      <tr>
-        <td><span class="code-text">${escapeHtml(a.alert_id)}</span></td>
-        <td><span class="badge ${getSeverityClass(a.severity)}">${a.severity}</span></td>
-        <td>${formatAlertType(a.alert_type)}</td>
-        <td title="${escapeHtml(a.description)}">${escapeHtml(a.description?.substring(0, 65) || '—')}${a.description?.length > 65 ? '…' : ''}</td>
-        <td><span class="code-text">${escapeHtml(a.source_ip || '—')}</span></td>
-        <td>${escapeHtml(a.username || '—')}</td>
-        <td style="font-size:.72rem;">${formatTimestamp(a.timestamp)}</td>
-        <td>
-          <select class="form-control" style="padding:.2rem .5rem;font-size:.75rem;width:140px;" onchange="updateStatus(${a.id}, this.value)">
-            <option value="new" ${a.status === 'new' ? 'selected' : ''}>🔴 New</option>
-            <option value="investigating" ${a.status === 'investigating' ? 'selected' : ''}>🟡 Investigating</option>
-            <option value="resolved" ${a.status === 'resolved' ? 'selected' : ''}>🟢 Resolved</option>
-            <option value="false_positive" ${a.status === 'false_positive' ? 'selected' : ''}>⚪ False Positive</option>
-          </select>
-        </td>
-      </tr>`).join('');
-
-    renderThreatPagination(data.page, data.pages, data.total);
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color:var(--accent-red);">Error: ${e.message}</td></tr>`;
-  }
-}
-
-async function runScan() {
-  const caseId = document.getElementById('scan-case-id')?.value;
-  if (!caseId) { showNotification('Please select a case to scan', 'error'); return; }
-
-  const btn = document.getElementById('scan-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '🔍 Scanning…'; }
-  showLoading('Running threat detection algorithms…');
-
-  try {
-    const data = await apiRequest(`/api/threats/scan/${caseId}`, 'POST');
-    hideLoading();
-    showNotification(`Scan complete: ${data.alerts_created} new alert(s) detected`, data.alerts_created > 0 ? 'warning' : 'success');
-    loadThreats(1);
-    loadThreatStats();
-  } catch (e) {
-    hideLoading();
-    showNotification('Scan failed: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🔍 Run Threat Scan'; }
-  }
-}
-
-async function updateStatus(alertId, status) {
-  try {
-    await apiRequest(`/api/threats/${alertId}/status`, 'PATCH', { status });
-    showNotification(`Alert status updated to: ${status}`, 'success');
-    loadThreatStats();
-  } catch (e) {
-    showNotification('Update failed: ' + e.message, 'error');
+    console.error('Threat case options error:', e);
   }
 }
 
 async function loadThreatStats() {
   try {
     const data = await apiRequest('/api/threats/stats');
-    setEl('stat-total', data.total);
-    setEl('stat-investigating', data.investigating);
+    setEl('threatStatTotal', data.total ?? 0);
+    setEl('threatStatInvestigating', data.investigating ?? 0);
 
-    const critical = data.by_severity?.critical || 0;
-    const high = data.by_severity?.high || 0;
-    setEl('stat-critical', critical + high);
-
-    const ctx = document.getElementById('threat-type-chart');
-    if (ctx && Object.keys(data.by_type || {}).length) {
-      if (threatChart) threatChart.destroy();
-      const labels = Object.keys(data.by_type).map(t => formatAlertType(t));
-      const values = Object.values(data.by_type);
-      const colors = ['#ff4757','#ffa502','#ffd32a','#00d4ff','#00ff88','#a855f7','#3b82f6'];
-      threatChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [{ data: values, backgroundColor: colors.slice(0, values.length), borderRadius: 4 }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#162032', titleColor: '#e8f0fe', bodyColor: '#8892a4', borderColor: '#1e2d3d', borderWidth: 1 } },
-          scales: {
-            x: { ticks: { color: '#4a5568', font: { size: 10 } }, grid: { color: 'rgba(30,45,61,0.5)' } },
-            y: { ticks: { color: '#4a5568', font: { size: 10 } }, grid: { color: 'rgba(30,45,61,0.5)' }, beginAtZero: true }
-          }
-        }
-      });
-    }
-  } catch (e) { console.error('Stats error:', e); }
-}
-
-function renderThreatPagination(page, pages, total) {
-  const container = document.getElementById('threat-pagination');
-  if (!container) return;
-  if (pages <= 1) { container.innerHTML = `<div class="pagination-info">${total} alerts</div>`; return; }
-  let html = `<div class="pagination">`;
-  html += `<button class="pagination-btn" onclick="loadThreats(${page - 1})" ${page <= 1 ? 'disabled' : ''}>‹</button>`;
-  for (let p = Math.max(1, page - 2); p <= Math.min(pages, page + 2); p++) {
-    html += `<button class="pagination-btn ${p === page ? 'active' : ''}" onclick="loadThreats(${p})">${p}</button>`;
+    const critical = data.by_severity?.critical ?? 0;
+    const high = data.by_severity?.high ?? 0;
+    setEl('threatStatCritical', critical);
+    setEl('threatStatHigh', high);
+  } catch (e) {
+    console.error('Threat stats load error:', e);
   }
-  html += `<button class="pagination-btn" onclick="loadThreats(${page + 1})" ${page >= pages ? 'disabled' : ''}>›</button>`;
-  html += `<span class="pagination-info">${total} total</span></div>`;
-  container.innerHTML = html;
 }
 
-function formatAlertType(type) {
-  const labels = {
-    brute_force: 'Brute Force', off_hours_access: 'Off-Hours Access',
-    privilege_escalation: 'Privilege Escalation', data_exfiltration: 'Data Exfiltration',
-    lateral_movement: 'Lateral Movement', suspicious_process: 'Suspicious Process',
-    unusual_ip: 'Unusual IP'
-  };
-  return labels[type] || (type || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+function buildThreatParams(page = 1) {
+  const p = new URLSearchParams({ page, per_page: 50 });
+  const caseId = document.getElementById('filterThreatCase')?.value;
+  const etype = document.getElementById('filterThreatType')?.value;
+  const sev = document.getElementById('filterThreatSeverity')?.value;
+  const status = document.getElementById('filterThreatStatus')?.value;
+
+  if (caseId) p.set('case_id', caseId);
+  if (etype) p.set('alert_type', etype);
+  if (sev) p.set('severity', sev);
+  if (status) p.set('status', status);
+
+  return p;
+}
+
+async function loadThreats(page = 1) {
+  currentPage = page;
+  const tbody = document.getElementById('threatsTableBody') || document.getElementById('threats-tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr><td colspan="9" class="table-empty-cell" style="text-align:center;padding:2rem;"><div class="inline-spinner"></div> Querying threat alert repository...</td></tr>`;
+
+  try {
+    const params = buildThreatParams(page);
+    const data = await apiRequest('/api/threats/list?' + params.toString());
+    allAlerts = data.alerts || [];
+    totalPages = data.pages || 1;
+
+    filterThreatsLocally();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="9" class="table-empty-cell" style="color:#ff4757;text-align:center;">Error loading threat detections: ${err.message}</td></tr>`;
+  }
+}
+
+function filterThreatsLocally() {
+  const tbody = document.getElementById('threatsTableBody') || document.getElementById('threats-tbody');
+  if (!tbody) return;
+
+  const q = document.getElementById('threatSearchInput')?.value?.toLowerCase()?.trim();
+  let alerts = allAlerts;
+
+  if (q) {
+    alerts = alerts.filter(a => 
+      (a.alert_type && a.alert_type.toLowerCase().includes(q)) ||
+      (a.description && a.description.toLowerCase().includes(q)) ||
+      (a.source_ip && a.source_ip.toLowerCase().includes(q)) ||
+      (a.username && a.username.toLowerCase().includes(q)) ||
+      (a.alert_id && a.alert_id.toLowerCase().includes(q))
+    );
+  }
+
+  if (alerts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="table-empty-cell" style="text-align:center;padding:2.5rem;color:#8892a4;">
+      <div style="font-size:2rem;margin-bottom:.5rem;">🛡️</div>
+      <div>No threat alerts found matching current filters.</div>
+      <div style="font-size:.78rem;margin-top:.3rem;color:#64748b;">Select an incident docket above and run a heuristic threat scan.</div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = alerts.map(a => `
+    <tr>
+      <td><span class="code-text" style="color:#00d4ff;font-weight:600;">${escapeHtml(a.alert_id)}</span></td>
+      <td>
+        <span class="badge ${getCategoryBadgeClass(a.alert_type)}">${escapeHtml(a.alert_type)}</span>
+      </td>
+      <td>
+        <span class="badge ${getSeverityBadgeClass(a.severity)}">${escapeHtml(a.severity?.toUpperCase() || 'MEDIUM')}</span>
+      </td>
+      <td>
+        <div style="font-weight:500;color:#e8f0fe;font-size:.82rem;">${escapeHtml(a.description)}</div>
+        ${a.case_ref ? `<div style="font-size:.72rem;color:#8892a4;">Case: ${escapeHtml(a.case_ref)}</div>` : ''}
+      </td>
+      <td>
+        <span class="code-text" style="color:${a.severity === 'critical' ? '#ff4757' : '#00d4ff'};">${escapeHtml(a.source_ip || '—')}</span>
+      </td>
+      <td>
+        <span style="font-weight:500;color:#e8f0fe;">${escapeHtml(a.username || '—')}</span>
+      </td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem;white-space:nowrap;color:#8892a4;">
+        ${formatTimestamp(a.timestamp || a.detected_at)}
+      </td>
+      <td>
+        <span class="badge ${getStatusBadgeClass(a.status)}">${escapeHtml(formatStatus(a.status))}</span>
+      </td>
+      <td style="text-align:right;">
+        <select class="form-select form-select-xs" style="width:130px;display:inline-block;font-size:.74rem;padding:.2rem .4rem;" onchange="updateAlertStatus(${a.id}, this.value)">
+          <option value="new" ${a.status === 'new' ? 'selected' : ''}>🔴 New</option>
+          <option value="investigating" ${a.status === 'investigating' ? 'selected' : ''}>🟡 In Triage</option>
+          <option value="resolved" ${a.status === 'resolved' ? 'selected' : ''}>🟢 Resolved</option>
+          <option value="false_positive" ${a.status === 'false_positive' ? 'selected' : ''}>⚪ False Pos</option>
+        </select>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function runThreatScan() {
+  const caseId = (document.getElementById('scanCaseSelector') || document.getElementById('scan-case-id'))?.value;
+  if (!caseId) {
+    showNotification('Please select an incident docket to scan', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('runThreatScanBtn') || document.getElementById('scan-btn');
+  if (btn) btn.disabled = true;
+
+  showLoading('Evaluating heuristic threat detection rules & MITRE ATT&CK vectors...');
+
+  try {
+    const res = await apiRequest(`/api/threats/scan/${caseId}`, 'POST');
+    hideLoading();
+    if (btn) btn.disabled = false;
+
+    showNotification(`Scan complete! ${res.alerts_created || 0} new threat alert(s) detected.`, res.alerts_created > 0 ? 'warning' : 'success');
+    loadThreatStats();
+    loadThreats(1);
+  } catch (err) {
+    hideLoading();
+    if (btn) btn.disabled = false;
+    showNotification('Threat scan failed: ' + err.message, 'error');
+  }
+}
+
+async function updateAlertStatus(alertId, newStatus) {
+  try {
+    await apiRequest(`/api/threats/${alertId}/status`, 'PATCH', { status: newStatus });
+    showNotification(`Alert status updated to: ${formatStatus(newStatus)}`, 'success');
+    loadThreatStats();
+    loadThreats(currentPage);
+  } catch (err) {
+    showNotification('Failed to update alert status: ' + err.message, 'error');
+  }
 }
 
 function setEl(id, val) {
   const el = document.getElementById(id);
-  if (el) el.textContent = val || 0;
+  if (el) el.textContent = val ?? 0;
 }
 
-function applyFilters() { loadThreats(1); }
+function getCategoryBadgeClass(cat) {
+  const c = (cat || '').toLowerCase();
+  if (c.includes('brute') || c.includes('fail')) return 'badge-critical';
+  if (c.includes('exfil') || c.includes('lateral')) return 'badge-critical';
+  if (c.includes('privilege') || c.includes('escal')) return 'badge-high';
+  if (c.includes('unusual') || c.includes('hours')) return 'badge-warning';
+  return 'badge-info';
+}
+
+function getSeverityBadgeClass(sev) {
+  const s = (sev || '').toLowerCase();
+  if (s === 'critical') return 'badge-critical';
+  if (s === 'high') return 'badge-high';
+  if (s === 'medium') return 'badge-warning';
+  if (s === 'low') return 'badge-low';
+  return 'badge-info';
+}
+
+function getStatusBadgeClass(st) {
+  const s = (st || '').toLowerCase();
+  if (s === 'new') return 'badge-critical';
+  if (s === 'investigating') return 'badge-warning';
+  if (s === 'resolved') return 'badge-success';
+  return 'badge-info';
+}
+
+function formatStatus(st) {
+  if (!st) return 'New';
+  return st.replace(/_/g, ' ').toUpperCase();
+}

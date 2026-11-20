@@ -123,15 +123,81 @@ cybertrace-ai/
 
 ---
 
-## 🤖 AI Assistant
+## 🤖 AI Assistant (Dual Engine)
 
-Works without any API key (rule-based engine). Supports:
-- *"Who accessed the server at midnight?"*
+The AI Assistant can run in 100% offline rule-based mode or with LLM assistance:
+- **No-API Demo Mode (Default):** Zero setup required. Runs completely locally without third-party APIs. Natural language queries are grounded strictly in the evidence files and indexed logs with citations and timestamps.
+- **Gemini API Mode:** Set `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) and `AI_MODE=gemini` in `.env`.
+- **OpenAI API Mode:** Set `OPENAI_API_KEY` and `AI_MODE=openai` in `.env`.
+
+**Example Questions:**
+- *"Who accessed this system at midnight?"*
 - *"Show all failed login attempts"*
 - *"Which IP address generated the most suspicious events?"*
-- *"Give me a summary of all threats detected"*
+- *"What happened before and after this login?"*
+- *"Generate a summary of this incident"*
+- *"List all privilege escalation events"*
 
-Set `OPENAI_API_KEY` in `.env` to enable GPT-4 enhanced responses.
+---
+
+## 🧪 Running Automated Tests
+
+Run the full end-to-end integration test suite:
+```powershell
+python -m unittest tests/test_cybertrace.py
+```
+This tests:
+1. Authentication flow (Login / Logout / CSRF / Session)
+2. Dashboard metrics and event trend APIs
+3. Evidence upload, SHA-256 hash calculation, and integrity verification
+4. Log parsing, normalization, and filtering
+5. AI investigation engine intent matching and grounded responses
+6. Threat detection engine (brute force, off-hours, privilege escalation)
+7. Attack reconstruction graph node/edge topology
+8. Court-ready PDF report generation (ReportLab)
+
+---
+
+## ☁️ Deploying to Vercel
+
+CYBERTRACE AI is pre-configured with `vercel.json` and `api/index.py` for seamless deployment to Vercel Serverless Functions.
+
+### Method 1: Deploy via GitHub (Recommended)
+
+1. Commit and push your code to your GitHub repository:
+   ```powershell
+   git add .
+   git commit -m "Configure Vercel serverless deployment"
+   git push origin main
+   ```
+2. Go to [vercel.com/new](https://vercel.com/new) and log in with your GitHub account.
+3. Select your repository (**CyberTracker**).
+4. In the **Configure Project** screen:
+   - **Framework Preset:** *Other* (detected automatically via `vercel.json`)
+   - **Root Directory:** `./`
+   - In **Environment Variables**, add:
+     - `SECRET_KEY` = `<any-random-32-char-string>`
+     - `AI_MODE` = `rule_based` (or `gemini` / `openai`)
+     - `GEMINI_API_KEY` or `OPENAI_API_KEY` (optional)
+5. Click **Deploy**. Vercel will build and deploy your app in ~1 minute.
+
+### Method 2: Deploy via Vercel CLI
+
+1. Install Vercel CLI globally (if not already installed):
+   ```powershell
+   npm install -g vercel
+   ```
+2. From the project directory, log in and deploy:
+   ```powershell
+   vercel login
+   vercel
+   ```
+3. To deploy directly to production:
+   ```powershell
+   vercel --prod
+   ```
+
+> **Note on Serverless Storage:** In Vercel's serverless environment, files are stored in the writable `/tmp` directory and the database auto-seeds on initial cold start. For permanent database persistence across cold boots in production, set `DATABASE_URL` in your Vercel Project Settings to a hosted PostgreSQL/MySQL instance (such as Supabase, Neon, or PlanetScale).
 
 ---
 

@@ -77,15 +77,49 @@ def threat_severity():
 @dashboard_bp.route('/api/dashboard/event-trend')
 @login_required
 def event_trend():
-    days = 14
-    end_date = datetime.utcnow()
+    from flask import request
+    range_param = request.args.get('range', '14d')
+
+    # Determine latest timestamp in database to handle historical or simulated datasets seamlessly
+    max_ts = db.session.query(func.max(LogRecord.timestamp)).scalar()
+    now = datetime.utcnow()
+
+    # If the latest record is older than 3 days, anchor end_date to max_ts so charts always display real events
+    if max_ts and (now - max_ts).days > 3:
+        end_date = max_ts
+    else:
+        end_date = now
+
+    if range_param == '24h':
+        start_date = end_date - timedelta(hours=24)
+        results = db.session.query(
+            func.strftime('%Y-%m-%d %H:00:00', LogRecord.timestamp).label('hour_bucket'),
+            func.count(LogRecord.id).label('count')
+        ).filter(
+            LogRecord.timestamp >= start_date,
+            LogRecord.timestamp <= end_date
+        ).group_by('hour_bucket').order_by('hour_bucket').all()
+
+        hour_map = {str(r.hour_bucket): r.count for r in results}
+        labels = []
+        data = []
+        curr = start_date
+        while curr <= end_date:
+            h_str = curr.strftime('%Y-%m-%d %H:00:00')
+            labels.append(curr.strftime('%H:00'))
+            data.append(hour_map.get(h_str, 0))
+            curr += timedelta(hours=1)
+        return jsonify({'labels': labels, 'data': data})
+
+    days = 7 if range_param == '7d' else 14
     start_date = end_date - timedelta(days=days)
 
     results = db.session.query(
         func.date(LogRecord.timestamp).label('day'),
         func.count(LogRecord.id).label('count')
     ).filter(
-        LogRecord.timestamp >= start_date
+        LogRecord.timestamp >= start_date,
+        LogRecord.timestamp <= end_date
     ).group_by(func.date(LogRecord.timestamp)).order_by('day').all()
 
     day_map = {str(r.day): r.count for r in results}

@@ -276,7 +276,7 @@ def detect_suspicious_process(log_records):
     return alerts
 
 
-def run_all_detections(log_records):
+def run_all_detections(log_records, case_id=None):
     """Run all threat detection heuristics and return unified alerts."""
     all_alerts = []
     all_alerts.extend(detect_brute_force(log_records))

@@ -32,8 +32,14 @@ SAMPLE_USERS_LOGS = [
 
 
 def create_sample_files():
-    """Create the sample data directory and CSV/JSON/TXT files."""
+    """Create the sample data directory and CSV/JSON/TXT files with recent timestamps."""
     os.makedirs('sample_data', exist_ok=True)
+
+    # Dynamic base date: yesterday
+    base = datetime.utcnow().replace(minute=0, second=0, microsecond=0) - timedelta(days=1)
+    day_str = base.strftime('%Y-%m-%d')
+    next_day_str = (base + timedelta(days=1)).strftime('%Y-%m-%d')
+    mon_day = base.strftime('%b %d')
 
     # --- Sample Auth Log CSV ---
     csv_path = 'sample_data/sample_auth_logs.csv'
@@ -42,37 +48,37 @@ def create_sample_files():
         f.write('timestamp,source_ip,username,event_type,status,user_agent,session_id\n')
         rows = [
             # Normal business hours logins
-            ('2024-11-15 08:02:14', '10.0.0.5',    'jsmith',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-001'),
-            ('2024-11-15 08:15:33', '10.0.0.12',   'mdavis',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-002'),
-            ('2024-11-15 08:34:51', '192.168.1.15','admin_user',  'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-003'),
-            ('2024-11-15 09:12:04', '10.0.0.23',   'rjohnson',    'login', 'success', 'Mozilla/5.0 (Macintosh)',       'sess-004'),
-            ('2024-11-15 09:45:22', '172.16.0.8',  'lstewart',    'login', 'success', 'Mozilla/5.0 (Linux)',           'sess-005'),
-            ('2024-11-15 10:01:09', '10.0.1.100',  'bwilson',     'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-006'),
-            ('2024-11-15 11:22:17', '10.0.0.5',    'jsmith',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-007'),
-            ('2024-11-15 13:04:55', '10.0.0.12',   'mdavis',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-008'),
+            (f'{day_str} 08:02:14', '10.0.0.5',    'jsmith',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-001'),
+            (f'{day_str} 08:15:33', '10.0.0.12',   'mdavis',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-002'),
+            (f'{day_str} 08:34:51', '192.168.1.15','admin_user',  'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-003'),
+            (f'{day_str} 09:12:04', '10.0.0.23',   'rjohnson',    'login', 'success', 'Mozilla/5.0 (Macintosh)',       'sess-004'),
+            (f'{day_str} 09:45:22', '172.16.0.8',  'lstewart',    'login', 'success', 'Mozilla/5.0 (Linux)',           'sess-005'),
+            (f'{day_str} 10:01:09', '10.0.1.100',  'bwilson',     'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-006'),
+            (f'{day_str} 11:22:17', '10.0.0.5',    'jsmith',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-007'),
+            (f'{day_str} 13:04:55', '10.0.0.12',   'mdavis',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-008'),
             # Brute force from 203.0.113.42 at 02:15 AM
-            ('2024-11-15 02:15:03', SUSPICIOUS_IP_1, 'admin',     'login', 'failed',  'python-requests/2.28', 'sess-fail-01'),
-            ('2024-11-15 02:15:14', SUSPICIOUS_IP_1, 'admin',     'login', 'failed',  'python-requests/2.28', 'sess-fail-02'),
-            ('2024-11-15 02:15:22', SUSPICIOUS_IP_1, 'root',      'login', 'failed',  'python-requests/2.28', 'sess-fail-03'),
-            ('2024-11-15 02:15:33', SUSPICIOUS_IP_1, 'root',      'login', 'failed',  'python-requests/2.28', 'sess-fail-04'),
-            ('2024-11-15 02:15:41', SUSPICIOUS_IP_1, 'admin',     'login', 'failed',  'python-requests/2.28', 'sess-fail-05'),
-            ('2024-11-15 02:15:52', SUSPICIOUS_IP_1, 'jsmith',    'login', 'failed',  'python-requests/2.28', 'sess-fail-06'),
-            ('2024-11-15 02:16:04', SUSPICIOUS_IP_1, 'mdavis',    'login', 'failed',  'python-requests/2.28', 'sess-fail-07'),
-            ('2024-11-15 02:16:11', SUSPICIOUS_IP_1, 'lstewart',  'login', 'failed',  'python-requests/2.28', 'sess-fail-08'),
-            ('2024-11-15 02:16:23', SUSPICIOUS_IP_1, 'admin_user','login', 'failed',  'python-requests/2.28', 'sess-fail-09'),
-            ('2024-11-15 02:16:35', SUSPICIOUS_IP_1, 'sysadmin',  'login', 'failed',  'python-requests/2.28', 'sess-fail-10'),
-            ('2024-11-15 02:16:47', SUSPICIOUS_IP_1, 'operator',  'login', 'failed',  'python-requests/2.28', 'sess-fail-11'),
+            (f'{day_str} 02:15:03', SUSPICIOUS_IP_1, 'admin',     'login', 'failed',  'python-requests/2.28', 'sess-fail-01'),
+            (f'{day_str} 02:15:14', SUSPICIOUS_IP_1, 'admin',     'login', 'failed',  'python-requests/2.28', 'sess-fail-02'),
+            (f'{day_str} 02:15:22', SUSPICIOUS_IP_1, 'root',      'login', 'failed',  'python-requests/2.28', 'sess-fail-03'),
+            (f'{day_str} 02:15:33', SUSPICIOUS_IP_1, 'root',      'login', 'failed',  'python-requests/2.28', 'sess-fail-04'),
+            (f'{day_str} 02:15:41', SUSPICIOUS_IP_1, 'admin',     'login', 'failed',  'python-requests/2.28', 'sess-fail-05'),
+            (f'{day_str} 02:15:52', SUSPICIOUS_IP_1, 'jsmith',    'login', 'failed',  'python-requests/2.28', 'sess-fail-06'),
+            (f'{day_str} 02:16:04', SUSPICIOUS_IP_1, 'mdavis',    'login', 'failed',  'python-requests/2.28', 'sess-fail-07'),
+            (f'{day_str} 02:16:11', SUSPICIOUS_IP_1, 'lstewart',  'login', 'failed',  'python-requests/2.28', 'sess-fail-08'),
+            (f'{day_str} 02:16:23', SUSPICIOUS_IP_1, 'admin_user','login', 'failed',  'python-requests/2.28', 'sess-fail-09'),
+            (f'{day_str} 02:16:35', SUSPICIOUS_IP_1, 'sysadmin',  'login', 'failed',  'python-requests/2.28', 'sess-fail-10'),
+            (f'{day_str} 02:16:47', SUSPICIOUS_IP_1, 'operator',  'login', 'failed',  'python-requests/2.28', 'sess-fail-11'),
             # Successful off-hours login from unusual IP
-            ('2024-11-15 03:22:19', SUSPICIOUS_IP_2, 'jsmith',    'login', 'success', 'curl/7.84.0',          'sess-sus-01'),
+            (f'{day_str} 03:22:19', SUSPICIOUS_IP_2, 'jsmith',    'login', 'success', 'curl/7.84.0',          'sess-sus-01'),
             # Normal afternoon activity
-            ('2024-11-15 14:12:08', '10.0.0.5',    'jsmith',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-009'),
-            ('2024-11-15 14:35:40', '10.0.0.23',   'rjohnson',    'login', 'success', 'Mozilla/5.0 (Macintosh)',       'sess-010'),
-            ('2024-11-15 15:08:27', '192.168.1.15','admin_user',  'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-011'),
-            ('2024-11-15 16:22:51', '10.0.0.12',   'mdavis',      'logout','success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-002'),
-            ('2024-11-15 16:45:03', '10.0.0.5',    'jsmith',      'logout','success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-009'),
-            ('2024-11-15 17:01:19', '192.168.1.15','admin_user',  'logout','success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-011'),
-            ('2024-11-16 08:11:04', '10.0.0.5',    'jsmith',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-012'),
-            ('2024-11-16 08:28:33', '172.16.0.33',  'kmartin',    'login', 'success', 'Mozilla/5.0 (Linux)',           'sess-013'),
+            (f'{day_str} 14:12:08', '10.0.0.5',    'jsmith',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-009'),
+            (f'{day_str} 14:35:40', '10.0.0.23',   'rjohnson',    'login', 'success', 'Mozilla/5.0 (Macintosh)',       'sess-010'),
+            (f'{day_str} 15:08:27', '192.168.1.15','admin_user',  'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-011'),
+            (f'{day_str} 16:22:51', '10.0.0.12',   'mdavis',      'logout','success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-002'),
+            (f'{day_str} 16:45:03', '10.0.0.5',    'jsmith',      'logout','success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-009'),
+            (f'{day_str} 17:01:19', '192.168.1.15','admin_user',  'logout','success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-011'),
+            (f'{next_day_str} 08:11:04', '10.0.0.5',    'jsmith',      'login', 'success', 'Mozilla/5.0 (Windows NT 10.0)', 'sess-012'),
+            (f'{next_day_str} 08:28:33', '172.16.0.33',  'kmartin',    'login', 'success', 'Mozilla/5.0 (Linux)',           'sess-013'),
         ]
         for row in rows:
             f.write(','.join(str(r) for r in row) + '\n')
@@ -82,20 +88,20 @@ def create_sample_files():
     with open(json_path, 'w') as f:
         import json
         events = [
-            {"timestamp": "2024-11-15T02:17:05Z", "host": "srv-prod-01", "process": "sshd",         "pid": 4821, "event": "Session opened for user jsmith",             "user": "jsmith",      "severity": "info",     "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T02:19:33Z", "host": "srv-prod-01", "process": "sudo",          "pid": 4833, "event": "User jsmith ran: sudo -l",                   "user": "jsmith",      "severity": "medium",   "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T02:21:14Z", "host": "srv-prod-01", "process": "sudo",          "pid": 4844, "event": "User jsmith ran: sudo cat /etc/shadow",      "user": "jsmith",      "severity": "critical", "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T02:22:48Z", "host": "srv-prod-01", "process": "bash",          "pid": 4857, "event": "Command: echo cHl0aG9uMyAtYyAnaW1wb3J0...',","user": "jsmith",      "severity": "critical", "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T02:24:17Z", "host": "srv-prod-01", "process": "python3",       "pid": 4871, "event": "Process started by jsmith",                  "user": "jsmith",      "severity": "high",     "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T02:25:00Z", "host": "srv-prod-01", "process": "rsync",         "pid": 4885, "event": "File transfer to 198.51.100.77:/data/out",   "user": "jsmith",      "severity": "critical", "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T03:00:12Z", "host": "srv-db-01",   "process": "mysqld",        "pid": 2211, "event": "Query: SELECT * FROM customers LIMIT 50000", "user": "app_svc",     "severity": "high",     "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T03:02:45Z", "host": "srv-db-01",   "process": "mysqld",        "pid": 2219, "event": "Export to /tmp/customers_export.csv",        "user": "app_svc",     "severity": "critical", "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T08:30:00Z", "host": "srv-prod-01", "process": "systemd",       "pid": 1,    "event": "Service nginx started",                      "user": "root",        "severity": "info",     "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T09:00:00Z", "host": "srv-prod-02", "process": "cron",          "pid": 1234, "event": "Backup job started",                         "user": "backup_svc",  "severity": "info",     "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T10:15:33Z", "host": "srv-hr-01",   "process": "sshd",          "pid": 5100, "event": "Login from 10.0.0.5 as jsmith",              "user": "jsmith",      "severity": "info",     "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T10:18:22Z", "host": "srv-hr-01",   "process": "sshd",          "pid": 5111, "event": "Login from 10.0.0.5 as jsmith (second host)","user": "jsmith",      "severity": "medium",   "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T10:21:05Z", "host": "srv-fin-01",  "process": "sshd",          "pid": 6700, "event": "Login from 10.0.0.5 as jsmith (third host)", "user": "jsmith",      "severity": "high",     "data_classification": "SIMULATED"},
-            {"timestamp": "2024-11-15T12:00:00Z", "host": "srv-prod-01", "process": "logrotate",     "pid": 7001, "event": "Log rotation completed",                     "user": "root",        "severity": "info",     "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T02:17:05Z", "host": "srv-prod-01", "process": "sshd",         "pid": 4821, "event": "Session opened for user jsmith",             "user": "jsmith",      "severity": "info",     "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T02:19:33Z", "host": "srv-prod-01", "process": "sudo",          "pid": 4833, "event": "User jsmith ran: sudo -l",                   "user": "jsmith",      "severity": "medium",   "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T02:21:14Z", "host": "srv-prod-01", "process": "sudo",          "pid": 4844, "event": "User jsmith ran: sudo cat /etc/shadow",      "user": "jsmith",      "severity": "critical", "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T02:22:48Z", "host": "srv-prod-01", "process": "bash",          "pid": 4857, "event": "Command: echo cHl0aG9uMyAtYyAnaW1wb3J0...',","user": "jsmith",      "severity": "critical", "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T02:24:17Z", "host": "srv-prod-01", "process": "python3",       "pid": 4871, "event": "Process started by jsmith",                  "user": "jsmith",      "severity": "high",     "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T02:25:00Z", "host": "srv-prod-01", "process": "rsync",         "pid": 4885, "event": "File transfer to 198.51.100.77:/data/out",   "user": "jsmith",      "severity": "critical", "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T03:00:12Z", "host": "srv-db-01",   "process": "mysqld",        "pid": 2211, "event": "Query: SELECT * FROM customers LIMIT 50000", "user": "app_svc",     "severity": "high",     "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T03:02:45Z", "host": "srv-db-01",   "process": "mysqld",        "pid": 2219, "event": "Export to /tmp/customers_export.csv",        "user": "app_svc",     "severity": "critical", "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T08:30:00Z", "host": "srv-prod-01", "process": "systemd",       "pid": 1,    "event": "Service nginx started",                      "user": "root",        "severity": "info",     "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T09:00:00Z", "host": "srv-prod-02", "process": "cron",          "pid": 1234, "event": "Backup job started",                         "user": "backup_svc",  "severity": "info",     "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T10:15:33Z", "host": "srv-hr-01",   "process": "sshd",          "pid": 5100, "event": "Login from 10.0.0.5 as jsmith",              "user": "jsmith",      "severity": "info",     "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T10:18:22Z", "host": "srv-hr-01",   "process": "sshd",          "pid": 5111, "event": "Login from 10.0.0.5 as jsmith (second host)","user": "jsmith",      "severity": "medium",   "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T10:21:05Z", "host": "srv-fin-01",  "process": "sshd",          "pid": 6700, "event": "Login from 10.0.0.5 as jsmith (third host)", "user": "jsmith",      "severity": "high",     "data_classification": "SIMULATED"},
+            {"timestamp": f"{day_str}T12:00:00Z", "host": "srv-prod-01", "process": "logrotate",     "pid": 7001, "event": "Log rotation completed",                     "user": "root",        "severity": "info",     "data_classification": "SIMULATED"},
         ]
         json.dump(events, f, indent=2)
 
@@ -104,23 +110,23 @@ def create_sample_files():
     with open(txt_path, 'w') as f:
         lines = [
             '# SIMULATED NETWORK LOGS - Demonstration data only',
-            f'Nov 15 02:10:01 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=22',
-            f'Nov 15 02:10:03 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=22',
-            f'Nov 15 02:10:07 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=23',
-            f'Nov 15 02:10:11 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=3389',
-            f'Nov 15 02:11:04 firewall kernel: [UFW ALLOW] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=22',
-            f'Nov 15 02:11:04 dns srv-ns-01: query[A] malware-c2-domain.xyz from {SUSPICIOUS_IP_1}',
-            f'Nov 15 02:12:19 dns srv-ns-01: query[A] data-exfil-endpoint.net from 10.0.0.5',
-            f'Nov 15 02:14:55 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=445',
-            f'Nov 15 02:17:00 firewall kernel: [UFW ALLOW] IN=eth0 SRC={SUSPICIOUS_IP_2} DST=10.0.0.5 PROTO=TCP DPT=22',
-            f'Nov 15 02:25:03 fw01 pf: pass out on eth0 inet proto tcp 10.0.0.5:{SUSPICIOUS_IP_2} flags S/SA',
-            f'Nov 15 02:25:03 fw01 pf: OUTBOUND DATA 1.4GB to {SUSPICIOUS_IP_2}',
-            'Nov 15 08:00:00 fw01 pf: pass in on eth0 inet proto tcp 10.0.0.5:10.0.1.100',
-            'Nov 15 08:30:00 fw01 pf: pass in on eth0 inet proto tcp 192.168.1.15:10.0.0.5',
-            'Nov 15 09:00:00 dns srv-ns-01: query[A] internal-app.company.local from 10.0.0.5',
-            f'Nov 15 03:00:00 dns srv-ns-01: query[TXT] _dmarc.malware-c2-domain.xyz from {SUSPICIOUS_IP_1}',
-            'Nov 15 09:12:00 fw01 pf: pass in on eth0 inet proto tcp 10.0.0.23:10.0.1.100',
-            'Nov 15 10:00:00 fw01 bandwidth: summary: 1.4GB outbound anomaly detected',
+            f'{mon_day} 02:10:01 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=22',
+            f'{mon_day} 02:10:03 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=22',
+            f'{mon_day} 02:10:07 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=23',
+            f'{mon_day} 02:10:11 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=3389',
+            f'{mon_day} 02:11:04 firewall kernel: [UFW ALLOW] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=22',
+            f'{mon_day} 02:11:04 dns srv-ns-01: query[A] malware-c2-domain.xyz from {SUSPICIOUS_IP_1}',
+            f'{mon_day} 02:12:19 dns srv-ns-01: query[A] data-exfil-endpoint.net from 10.0.0.5',
+            f'{mon_day} 02:14:55 firewall kernel: [UFW BLOCK] IN=eth0 SRC={SUSPICIOUS_IP_1} DST=10.0.0.5 PROTO=TCP DPT=445',
+            f'{mon_day} 02:17:00 firewall kernel: [UFW ALLOW] IN=eth0 SRC={SUSPICIOUS_IP_2} DST=10.0.0.5 PROTO=TCP DPT=22',
+            f'{mon_day} 02:25:03 fw01 pf: pass out on eth0 inet proto tcp 10.0.0.5:{SUSPICIOUS_IP_2} flags S/SA',
+            f'{mon_day} 02:25:03 fw01 pf: OUTBOUND DATA 1.4GB to {SUSPICIOUS_IP_2}',
+            f'{mon_day} 08:00:00 fw01 pf: pass in on eth0 inet proto tcp 10.0.0.5:10.0.1.100',
+            f'{mon_day} 08:30:00 fw01 pf: pass in on eth0 inet proto tcp 192.168.1.15:10.0.0.5',
+            f'{mon_day} 09:00:00 dns srv-ns-01: query[A] internal-app.company.local from 10.0.0.5',
+            f'{mon_day} 03:00:00 dns srv-ns-01: query[TXT] _dmarc.malware-c2-domain.xyz from {SUSPICIOUS_IP_1}',
+            f'{mon_day} 09:12:00 fw01 pf: pass in on eth0 inet proto tcp 10.0.0.23:10.0.1.100',
+            f'{mon_day} 10:00:00 fw01 bandwidth: summary: 1.4GB outbound anomaly detected',
         ]
         f.write('\n'.join(lines))
 
@@ -230,7 +236,7 @@ def seed_database(csv_path, json_path, txt_path):
         print('✓ Evidence records created')
 
         # ── LOG RECORDS ───────────────────────────────────────────────────────
-        base = datetime(2024, 11, 15)
+        base = datetime.utcnow().replace(minute=0, second=0, microsecond=0) - timedelta(days=1)
 
         log_entries = []
 

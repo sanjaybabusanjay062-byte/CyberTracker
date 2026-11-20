@@ -46,7 +46,7 @@ def upload():
     if not case_id:
         return jsonify({'error': 'Case ID is required'}), 400
 
-    case = Case.query.get(case_id)
+    case = db.session.get(Case, int(case_id)) if case_id else None
     if not case:
         return jsonify({'error': 'Case not found'}), 404
 

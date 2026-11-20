@@ -8,22 +8,32 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 class Config:
     """CyberTrace AI configuration settings."""
 
+    # Detect Vercel or Serverless Environment
+    IS_VERCEL = bool(os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME'))
+
     # Security & Core
     SECRET_KEY = os.environ.get('SECRET_KEY', 'cybertrace-ai-insecure-secret-key-2024')
     DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 't')
 
     # Database
-    db_url = os.environ.get('DATABASE_URL', f"sqlite:///{os.path.join(BASE_DIR, 'cybertrace.db')}")
-    if db_url.startswith('sqlite:///') and not os.path.isabs(db_url.replace('sqlite:///', '')):
-        rel_path = db_url.replace('sqlite:///', '')
-        SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(BASE_DIR, rel_path)}"
-    else:
+    if IS_VERCEL:
+        import tempfile
+        tmp_dir = tempfile.gettempdir()
+        db_url = os.environ.get('DATABASE_URL', f"sqlite:///{os.path.join(tmp_dir, 'cybertrace.db')}")
         SQLALCHEMY_DATABASE_URI = db_url
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
+        UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(tmp_dir, 'uploads'))
+        REPORTS_FOLDER = os.environ.get('REPORTS_FOLDER', os.path.join(tmp_dir, 'reports'))
+    else:
+        db_url = os.environ.get('DATABASE_URL', f"sqlite:///{os.path.join(BASE_DIR, 'cybertrace.db')}")
+        if db_url.startswith('sqlite:///') and not os.path.isabs(db_url.replace('sqlite:///', '')):
+            rel_path = db_url.replace('sqlite:///', '')
+            SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(BASE_DIR, rel_path)}"
+        else:
+            SQLALCHEMY_DATABASE_URI = db_url
+        UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
+        REPORTS_FOLDER = os.environ.get('REPORTS_FOLDER', os.path.join(BASE_DIR, 'reports'))
 
-    # File Storage
-    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
-    REPORTS_FOLDER = os.environ.get('REPORTS_FOLDER', os.path.join(BASE_DIR, 'reports'))
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_UPLOAD_SIZE_MB', 50)) * 1024 * 1024
     ALLOWED_EXTENSIONS = {'csv', 'json', 'txt', 'log', 'pcap', 'xml'}
 

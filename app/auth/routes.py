@@ -28,16 +28,16 @@ def login():
         return redirect(url_for('dashboard.index'))
 
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        ident = (request.form.get('username') or request.form.get('email', '')).strip()
         password = request.form.get('password', '')
         remember = request.form.get('remember', False)
 
-        if not email or not password:
-            flash('Email and password are required.', 'error')
+        if not ident or not password:
+            flash('Identifier (username or email) and password are required.', 'error')
             return render_template('auth/login.html')
 
         user = User.query.filter(
-            (User.email == email) | (User.username == email)
+            (User.email == ident) | (User.username == ident)
         ).first()
 
         if user and user.is_active and check_password_hash(user.password_hash, password):
@@ -52,7 +52,7 @@ def login():
                 resource_type='auth',
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent', '')[:255],
-                details=f'User {user.email} logged in successfully'
+                details=f'User {user.username} logged in successfully'
             )
             db.session.add(entry)
             db.session.commit()
@@ -67,11 +67,11 @@ def login():
                 resource_type='auth',
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get('User-Agent', '')[:255],
-                details=f'Failed login attempt for: {email}'
+                details=f'Failed login attempt for identifier: {ident}'
             )
             db.session.add(entry)
             db.session.commit()
-            flash('Invalid credentials. Please check your email and password.', 'error')
+            flash('Invalid credentials. Please verify your investigator username and passkey.', 'error')
 
     return render_template('auth/login.html')
 

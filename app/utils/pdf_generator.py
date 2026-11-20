@@ -10,6 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
 from reportlab.pdfgen import canvas
 from app.models import Case, Evidence, LogRecord, ThreatAlert
+from app import db
 
 
 class NumberedCanvas(canvas.Canvas):
@@ -58,7 +59,7 @@ def generate_investigation_report(case_id, output_path):
     """Generate a high-grade forensic investigation PDF report for a given case."""
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
-    case = Case.query.get(case_id)
+    case = db.session.get(Case, case_id) if isinstance(case_id, int) else None
     if not case:
         case = Case.query.filter_by(case_id=case_id).first()
 

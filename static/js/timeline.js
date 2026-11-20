@@ -1,118 +1,253 @@
 /* CYBERTRACE AI — Incident Timeline JavaScript */
 
-let allEvents = [];
-let filteredEvents = [];
+let allTimelineEvents = [];
+let timelineZoomLevel = 1;
 
 document.addEventListener('DOMContentLoaded', () => {
+  loadCaseOptions();
   loadTimeline();
+
+  // Form submission
+  const form = document.getElementById('timelineFilterForm');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      loadTimeline();
+    });
+  }
+
+  // Filters change
+  const selects = ['timelineCaseSelect', 'timelineSeveritySelect', 'timelineEventTypeSelect', 'timelineDateRange'];
+  selects.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => loadTimeline());
+  });
+
+  // Search input debounced
+  const searchInput = document.getElementById('timelineSearchInput');
+  if (searchInput) {
+    let timer = null;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => filterTimelineLocally(), 200);
+    });
+  }
+
+  // Export Timeline
+  const exportBtn = document.getElementById('exportTimelineBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const params = buildTimelineParams();
+      window.location.href = '/api/timeline/export?' + params.toString();
+      showNotification('Exporting incident sequence timeline...', 'info');
+    });
+  }
+
+  // Zoom controls
+  const zoomIn = document.getElementById('zoomInTimelineBtn');
+  const zoomOut = document.getElementById('zoomOutTimelineBtn');
+  if (zoomIn) {
+    zoomIn.addEventListener('click', () => {
+      timelineZoomLevel = Math.min(1.4, timelineZoomLevel + 0.15);
+      applyZoom();
+    });
+  }
+  if (zoomOut) {
+    zoomOut.addEventListener('click', () => {
+      timelineZoomLevel = Math.max(0.75, timelineZoomLevel - 0.15);
+      applyZoom();
+    });
+  }
 });
 
-function buildParams() {
-  const p = new URLSearchParams({ limit: 300 });
-  const vals = {
-    case_id: 'filter-case-id',
-    severity: 'filter-severity',
-    event_type: 'filter-event-type',
-    start_date: 'filter-start',
-    end_date: 'filter-end'
-  };
-  for (const [key, id] of Object.entries(vals)) {
-    const val = document.getElementById(id)?.value;
-    if (val) p.set(key, val);
+function applyZoom() {
+  const container = document.getElementById('verticalTimeline') || document.getElementById('timeline-container');
+  if (container) {
+    container.style.transform = `scale(${timelineZoomLevel})`;
+    container.style.transformOrigin = 'top left';
   }
+}
+
+async function loadCaseOptions() {
+  try {
+    const data = await apiRequest('/api/cases/list?per_page=100');
+    const sel = document.getElementById('timelineCaseSelect') || document.getElementById('filter-case-id');
+    if (sel && data.cases) {
+      data.cases.forEach(c => {
+        sel.add(new Option(`${c.case_id} — ${c.title.substring(0, 36)}`, c.id));
+      });
+    }
+  } catch (e) {
+    console.error('Timeline cases load error:', e);
+  }
+}
+
+function buildTimelineParams() {
+  const p = new URLSearchParams({ limit: 400 });
+  const caseId = (document.getElementById('timelineCaseSelect') || document.getElementById('filter-case-id'))?.value;
+  const sev = (document.getElementById('timelineSeveritySelect') || document.getElementById('filter-severity'))?.value;
+  const etype = (document.getElementById('timelineEventTypeSelect') || document.getElementById('filter-event-type'))?.value;
+  const range = (document.getElementById('timelineDateRange'))?.value;
+
+  if (caseId) p.set('case_id', caseId);
+  if (sev) p.set('severity', sev);
+  if (etype) p.set('event_type', etype);
+
+  if (range === '24h') {
+    p.set('start_date', new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+  } else if (range === '7d') {
+    p.set('start_date', new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString());
+  }
+
   return p;
 }
 
 async function loadTimeline() {
-  const container = document.getElementById('timeline-container');
-  const countEl = document.getElementById('event-count');
-  if (!container) return;
-  container.innerHTML = `<div style="text-align:center;padding:3rem;"><div class="spinner" style="margin:0 auto;"></div><div style="color:var(--text-muted);margin-top:1rem;">Loading events…</div></div>`;
+  const container = document.getElementById('verticalTimeline') || document.getElementById('timeline-container');
+  const loading = document.getElementById('timelineLoading');
+  const empty = document.getElementById('timelineEmpty');
+  const statsBadge = document.getElementById('timelineStatsBadge');
+
+  if (loading) loading.style.display = 'flex';
+  if (empty) empty.style.display = 'none';
+  if (container) container.innerHTML = '';
 
   try {
-    const data = await apiRequest('/api/timeline/events?' + buildParams().toString());
-    allEvents = data.events || [];
-    filteredEvents = allEvents;
-    if (countEl) countEl.textContent = allEvents.length;
-    renderTimeline(allEvents);
-  } catch (e) {
-    container.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--accent-red);">Error loading timeline: ${e.message}</div>`;
+    const params = buildTimelineParams();
+    const data = await apiRequest('/api/timeline/events?' + params.toString());
+    allTimelineEvents = data.events || [];
+
+    if (loading) loading.style.display = 'none';
+
+    if (statsBadge) {
+      statsBadge.textContent = `${allTimelineEvents.length} Sequential Events Reconstructed`;
+    }
+
+    filterTimelineLocally();
+  } catch (err) {
+    if (loading) loading.style.display = 'none';
+    if (container) {
+      container.innerHTML = `<div style="text-align:center;padding:2rem;color:#ff4757;">Failed to reconstruct timeline: ${err.message}</div>`;
+    }
   }
+}
+
+function filterTimelineLocally() {
+  const q = document.getElementById('timelineSearchInput')?.value?.toLowerCase()?.trim();
+  let events = allTimelineEvents;
+
+  if (q) {
+    events = events.filter(e => 
+      (e.event_description && e.event_description.toLowerCase().includes(q)) ||
+      (e.source_ip && e.source_ip.toLowerCase().includes(q)) ||
+      (e.username && e.username.toLowerCase().includes(q)) ||
+      (e.event_type && e.event_type.toLowerCase().includes(q))
+    );
+  }
+
+  renderTimeline(events);
 }
 
 function renderTimeline(events) {
-  const container = document.getElementById('timeline-container');
+  const container = document.getElementById('verticalTimeline') || document.getElementById('timeline-container');
+  const empty = document.getElementById('timelineEmpty');
+
   if (!container) return;
 
   if (!events || events.length === 0) {
-    container.innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-muted);">
-      <div style="font-size:2.5rem;margin-bottom:1rem;">🕐</div>
-      <div>No events found for the selected filters</div>
-      <div style="font-size:.8rem;margin-top:.3rem;">Try uploading and analyzing evidence files</div>
-    </div>`;
+    if (empty) empty.style.display = 'block';
+    container.innerHTML = '';
     return;
   }
 
-  // Group events by date
+  if (empty) empty.style.display = 'none';
+
+  // Group by calendar day
   const groups = {};
   events.forEach(ev => {
-    const date = ev.timestamp ? ev.timestamp.split('T')[0] : 'Unknown Date';
-    if (!groups[date]) groups[date] = [];
-    groups[date].push(ev);
+    const day = ev.timestamp ? ev.timestamp.split('T')[0] : 'Unknown Date';
+    if (!groups[day]) groups[day] = [];
+    groups[day].push(ev);
   });
 
-  let html = '<div class="timeline-track">';
-  for (const [date, dayEvents] of Object.entries(groups)) {
-    const displayDate = formatDate(date);
-    html += `<div style="margin:1.5rem 0 1rem;display:flex;align-items:center;gap:.75rem;">
-      <div style="font-size:.78rem;font-weight:600;color:var(--accent-cyan);letter-spacing:.05em;text-transform:uppercase;">${displayDate}</div>
-      <div style="flex:1;height:1px;background:var(--border-color);"></div>
-      <span class="badge badge-info" style="font-size:.68rem;">${dayEvents.length} events</span>
-    </div>`;
+  let html = '';
+  for (const [dayStr, dayEvents] of Object.entries(groups)) {
+    const dateFormatted = formatDayHeader(dayStr);
+    html += `
+      <div class="timeline-day-separator">
+        <span class="day-badge">${dateFormatted}</span>
+        <span class="day-line"></span>
+        <span class="day-count">${dayEvents.length} events</span>
+      </div>
+    `;
 
-    dayEvents.forEach(ev => {
-      html += `<div class="timeline-item">
-        <div class="timeline-dot ${ev.severity || 'info'}"></div>
-        <div class="timeline-card">
-          <div class="timeline-time">${formatTimestamp(ev.timestamp)}</div>
-          <div class="timeline-event-type">
-            <span class="badge ${getSeverityClass(ev.severity)}">${ev.severity || 'info'}</span>
-            <span style="margin-left:.5rem;font-size:.82rem;font-weight:500;color:var(--text-primary);">
-              ${formatEventType(ev.event_type)}
-            </span>
-            ${ev.is_suspicious ? '<span style="color:var(--accent-red);margin-left:.4rem;font-size:.8rem;">⚠️ Suspicious</span>' : ''}
+    dayEvents.forEach((ev, idx) => {
+      const sevClass = (ev.severity || 'info').toLowerCase();
+      const isCritical = sevClass === 'critical';
+      const timeStr = ev.timestamp ? formatTimestamp(ev.timestamp) : '—';
+
+      html += `
+        <div class="timeline-event-card sev-${sevClass} ${ev.is_suspicious ? 'suspicious-card' : ''}">
+          <div class="timeline-bullet bullet-${sevClass}">
+            <span class="bullet-inner"></span>
           </div>
-          <div class="timeline-desc">${escapeHtml(ev.event_description || 'No description')}</div>
-          <div class="timeline-meta">
-            ${ev.source_ip ? `<span>🌐 ${escapeHtml(ev.source_ip)}</span>` : ''}
-            ${ev.username ? `<span>👤 ${escapeHtml(ev.username)}</span>` : ''}
-            ${ev.destination_ip ? `<span>→ ${escapeHtml(ev.destination_ip)}</span>` : ''}
-            ${ev.threat_category ? `<span style="color:var(--accent-orange);">🏷️ ${escapeHtml(ev.threat_category)}</span>` : ''}
+          <div class="timeline-content-box">
+            <div class="event-meta-row">
+              <span class="event-timestamp">${timeStr}</span>
+              <div class="badge-group">
+                <span class="badge ${getSeverityBadgeClass(sevClass)}">${sevClass.toUpperCase()}</span>
+                <span class="badge badge-info">${escapeHtml(formatEventType(ev.event_type))}</span>
+                ${ev.is_suspicious ? '<span class="badge badge-critical">FLAGGED IOC</span>' : ''}
+              </div>
+            </div>
+
+            <div class="event-title-text">
+              ${escapeHtml(ev.event_description || 'Security Telemetry Event')}
+            </div>
+
+            <div class="event-details-bar">
+              ${ev.source_ip ? `<span class="detail-pill"><span class="pill-label">SRC IP:</span> <code class="code-text">${escapeHtml(ev.source_ip)}</code></span>` : ''}
+              ${ev.destination_ip ? `<span class="detail-pill"><span class="pill-label">DST IP:</span> <code class="code-text">${escapeHtml(ev.destination_ip)}</code></span>` : ''}
+              ${ev.username ? `<span class="detail-pill"><span class="pill-label">USER:</span> <strong style="color:#e8f0fe;">${escapeHtml(ev.username)}</strong></span>` : ''}
+              ${ev.threat_category ? `<span class="detail-pill text-orange"><span class="pill-label">ATT&CK:</span> ${escapeHtml(ev.threat_category)}</span>` : ''}
+            </div>
+
+            ${ev.raw_log ? `
+              <div class="event-raw-toggle" onclick="this.nextElementSibling.classList.toggle('open');">
+                <span>View Raw Event Payload &rsaquo;</span>
+              </div>
+              <div class="event-raw-box">
+                <pre class="raw-pre"><code>${escapeHtml(ev.raw_log)}</code></pre>
+              </div>
+            ` : ''}
           </div>
         </div>
-      </div>`;
+      `;
     });
   }
-  html += '</div>';
+
   container.innerHTML = html;
 }
 
-function formatDate(dateStr) {
-  if (!dateStr || dateStr === 'Unknown Date') return 'Unknown Date';
+function formatDayHeader(dayStr) {
   try {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  } catch (_) { return dateStr; }
+    const d = new Date(dayStr);
+    return d.toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+  } catch (_) {
+    return dayStr;
+  }
 }
 
-function formatEventType(type) {
-  return (type || 'unknown').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+function getSeverityBadgeClass(sev) {
+  const s = (sev || '').toLowerCase();
+  if (s === 'critical') return 'badge-critical';
+  if (s === 'high') return 'badge-high';
+  if (s === 'medium') return 'badge-medium';
+  if (s === 'low') return 'badge-low';
+  return 'badge-info';
 }
 
-function applyFilters() { loadTimeline(); }
-
-function filterBySeverity(severity) {
-  const sel = document.getElementById('filter-severity');
-  if (sel) sel.value = severity;
-  loadTimeline();
+function formatEventType(etype) {
+  if (!etype) return 'Event';
+  return etype.replace(/_/g, ' ').toUpperCase();
 }

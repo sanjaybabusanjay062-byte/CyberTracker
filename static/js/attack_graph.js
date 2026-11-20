@@ -5,69 +5,137 @@ let canvas, ctx;
 let scale = 1, panX = 0, panY = 0;
 let isPanning = false, lastMx = 0, lastMy = 0;
 let hoveredNode = null;
+let selectedNode = null;
+let showLabels = true;
 
 const NODE_COLORS = {
   ip: { normal: '#3b82f6', suspicious: '#ff4757', text: '#fff' },
   user: { normal: '#00d4ff', suspicious: '#ffa502', text: '#000' },
+  sys: { normal: '#a855f7', suspicious: '#ff4757', text: '#fff' },
   event: { normal: '#ffd32a', suspicious: '#ff4757', text: '#000' }
 };
-const EDGE_COLORS = { confirmed: '#00ff88', inferred: '#4a5568' };
+
+const EDGE_COLORS = {
+  confirmed: '#00ff88',
+  inferred: '#64748b'
+};
 
 document.addEventListener('DOMContentLoaded', () => {
-  canvas = document.getElementById('attack-canvas');
+  canvas = document.getElementById('attackGraphCanvas') || document.getElementById('attack-canvas');
   if (!canvas) return;
   ctx = canvas.getContext('2d');
+
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  // Pan interactions
+  loadCaseOptions();
+
+  // Mouse pan/zoom/click
   canvas.addEventListener('mousedown', onMouseDown);
   canvas.addEventListener('mousemove', onMouseMove);
-  canvas.addEventListener('mouseup', () => { isPanning = false; });
-  canvas.addEventListener('mouseleave', () => { isPanning = false; hoveredNode = null; drawGraph(); });
+  canvas.addEventListener('mouseup', onMouseUp);
+  canvas.addEventListener('mouseleave', () => {
+    isPanning = false;
+    hoveredNode = null;
+    drawGraph();
+  });
   canvas.addEventListener('wheel', onWheel, { passive: false });
 
+  // Toolbar buttons
+  document.getElementById('graphZoomInBtn')?.addEventListener('click', () => { scale = Math.min(3, scale * 1.25); drawGraph(); });
+  document.getElementById('graphZoomOutBtn')?.addEventListener('click', () => { scale = Math.max(0.3, scale / 1.25); drawGraph(); });
+  document.getElementById('graphResetBtn')?.addEventListener('click', resetViewport);
+
+  const toggleLabelsBtn = document.getElementById('graphToggleLabelsBtn');
+  if (toggleLabelsBtn) {
+    toggleLabelsBtn.addEventListener('click', () => {
+      showLabels = !showLabels;
+      const textSpan = document.getElementById('labelToggleText');
+      if (textSpan) textSpan.textContent = `Labels: ${showLabels ? 'On' : 'Off'}`;
+      drawGraph();
+    });
+  }
+
+  const refreshBtn = document.getElementById('refreshGraphBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      loadGraph();
+      showNotification('Attack graph topology recomputed', 'info');
+    });
+  }
+
+  // Inspector Action Buttons
+  document.getElementById('btnFilterLogsForNode')?.addEventListener('click', () => {
+    if (selectedNode) {
+      const q = encodeURIComponent(selectedNode.label);
+      window.location.href = `/logs?search=${q}`;
+    }
+  });
+
+  document.getElementById('btnAskAiAboutNode')?.addEventListener('click', () => {
+    if (selectedNode) {
+      window.location.href = `/ai-assistant`;
+    }
+  });
+
+  // Initial load
   loadGraph();
 });
+
+async function loadCaseOptions() {
+  try {
+    const data = await apiRequest('/api/cases/list?per_page=100');
+    const sel = document.getElementById('graphCaseSelector') || document.getElementById('graph-case-id');
+    if (!sel || !data.cases) return;
+
+    data.cases.forEach(c => {
+      sel.add(new Option(`${c.case_id} — ${c.title.substring(0, 36)}`, c.id));
+    });
+
+    sel.addEventListener('change', () => loadGraph());
+  } catch (e) {
+    console.error('Case options load error:', e);
+  }
+}
 
 function resizeCanvas() {
   if (!canvas) return;
   const container = canvas.parentElement;
-  canvas.width = container.clientWidth;
-  canvas.height = Math.max(500, container.clientHeight);
+  if (!container) return;
+  canvas.width = container.clientWidth || 960;
+  canvas.height = Math.max(560, container.clientHeight || 560);
   drawGraph();
 }
 
 async function loadGraph() {
-  const caseId = document.getElementById('graph-case-id')?.value;
-  if (!caseId) {
-    drawEmptyState('Select a case to load the attack graph');
-    return;
-  }
-  drawEmptyState('Loading graph data…');
+  const caseId = (document.getElementById('graphCaseSelector') || document.getElementById('graph-case-id'))?.value;
+  drawEmptyState('Calculating graph topology & correlation vectors…');
+
   try {
-    const data = await apiRequest('/api/attack-graph/data?case_id=' + caseId);
+    const url = '/api/attack-graph/data' + (caseId ? `?case_id=${caseId}` : '');
+    const data = await apiRequest(url);
     graphData = data;
 
     // Update stats
-    setEl('node-count', data.stats?.total_nodes || 0);
-    setEl('edge-count', data.stats?.total_edges || 0);
-    setEl('suspicious-count', data.stats?.suspicious_nodes || 0);
+    setElementText('nodeCountText', data.stats?.total_nodes ?? data.nodes?.length ?? 0);
+    setElementText('edgeCountText', data.stats?.total_edges ?? data.edges?.length ?? 0);
+    setElementText('node-count', data.stats?.total_nodes ?? data.nodes?.length ?? 0);
+    setElementText('edge-count', data.stats?.total_edges ?? data.edges?.length ?? 0);
 
-    // Auto-layout if not already set
-    spreadNodes(data.nodes);
-    scale = 1; panX = 0; panY = 0;
-    drawGraph();
-  } catch (e) {
-    drawEmptyState('Error loading graph: ' + e.message);
+    // Spread nodes relative to current canvas dimensions
+    spreadNodes(graphData.nodes);
+    resetViewport();
+  } catch (err) {
+    drawEmptyState('Error loading attack graph: ' + err.message);
   }
 }
 
 function spreadNodes(nodes) {
-  if (!nodes.length) return;
+  if (!nodes || !nodes.length) return;
   const w = canvas.width, h = canvas.height;
   const cx = w / 2, cy = h / 2;
-  const radius = Math.min(w, h) * 0.35;
+  const radius = Math.min(w, h) * 0.38;
+
   nodes.forEach((node, i) => {
     const angle = (2 * Math.PI * i) / nodes.length;
     node.x = cx + radius * Math.cos(angle);
@@ -75,20 +143,28 @@ function spreadNodes(nodes) {
   });
 }
 
+function resetViewport() {
+  scale = 1;
+  panX = 0;
+  panY = 0;
+  drawGraph();
+}
+
 function drawGraph() {
   if (!ctx || !canvas) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Dark background
+  // Background
   ctx.fillStyle = '#0a0e1a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Grid
-  ctx.strokeStyle = 'rgba(30,45,61,0.4)';
+  // Background grid
+  ctx.strokeStyle = 'rgba(30,45,61,0.35)';
   ctx.lineWidth = 1;
-  const gridSize = 50 * scale;
-  const offsetX = panX % gridSize;
-  const offsetY = panY % gridSize;
+  const gridSize = 48 * scale;
+  const offsetX = (panX % gridSize + gridSize) % gridSize;
+  const offsetY = (panY % gridSize + gridSize) % gridSize;
+
   for (let x = offsetX; x < canvas.width; x += gridSize) {
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
   }
@@ -96,15 +172,19 @@ function drawGraph() {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
   }
 
-  if (!graphData.nodes.length) return;
+  if (!graphData.nodes || !graphData.nodes.length) {
+    drawEmptyState('No entities mapped in this incident scope.');
+    return;
+  }
 
   ctx.save();
   ctx.translate(panX, panY);
   ctx.scale(scale, scale);
 
-  // Draw edges
+  // 1. Draw Edges
   graphData.edges.forEach(edge => drawEdge(edge));
-  // Draw nodes
+
+  // 2. Draw Nodes
   graphData.nodes.forEach(node => drawNode(node));
 
   ctx.restore();
@@ -115,98 +195,122 @@ function drawEdge(edge) {
   const to = graphData.nodes.find(n => n.id === edge.to);
   if (!from || !to) return;
 
+  const isConfirmed = edge.type === 'confirmed';
   ctx.beginPath();
   ctx.moveTo(from.x, from.y);
-  // Slight curve
+
+  // Smooth quadratic curve
   const mx = (from.x + to.x) / 2;
-  const my = (from.y + to.y) / 2 - 20;
+  const my = (from.y + to.y) / 2 - 16;
   ctx.quadraticCurveTo(mx, my, to.x, to.y);
 
-  ctx.strokeStyle = edge.type === 'confirmed' ? EDGE_COLORS.confirmed : EDGE_COLORS.inferred;
-  ctx.lineWidth = edge.type === 'confirmed' ? 2 : 1;
-  ctx.globalAlpha = 0.6;
-  if (edge.type === 'inferred') {
-    ctx.setLineDash([5, 5]);
-  } else {
+  ctx.strokeStyle = isConfirmed ? EDGE_COLORS.confirmed : EDGE_COLORS.inferred;
+  ctx.lineWidth = isConfirmed ? 2 : 1.2;
+  ctx.globalAlpha = isConfirmed ? 0.75 : 0.5;
+
+  if (isConfirmed) {
     ctx.setLineDash([]);
+  } else {
+    ctx.setLineDash([6, 5]);
   }
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.globalAlpha = 1;
 
-  // Arrow head
-  const angle = Math.atan2(to.y - from.y, to.x - from.x);
-  const arrowLen = 10;
-  const ax = to.x - arrowLen * Math.cos(angle);
-  const ay = to.y - arrowLen * Math.sin(angle);
+  // Arrowhead pointing towards target
+  const angle = Math.atan2(to.y - my, to.x - mx);
+  const arrowLen = 9;
+  const ax = to.x - 22 * Math.cos(angle);
+  const ay = to.y - 22 * Math.sin(angle);
+
   ctx.beginPath();
-  ctx.moveTo(to.x, to.y);
-  ctx.lineTo(ax - 5 * Math.sin(angle), ay + 5 * Math.cos(angle));
-  ctx.lineTo(ax + 5 * Math.sin(angle), ay - 5 * Math.cos(angle));
+  ctx.moveTo(ax, ay);
+  ctx.lineTo(ax - arrowLen * Math.cos(angle - Math.PI / 6), ay - arrowLen * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(ax - arrowLen * Math.cos(angle + Math.PI / 6), ay - arrowLen * Math.sin(angle + Math.PI / 6));
   ctx.closePath();
-  ctx.fillStyle = edge.type === 'confirmed' ? EDGE_COLORS.confirmed : EDGE_COLORS.inferred;
+  ctx.fillStyle = isConfirmed ? EDGE_COLORS.confirmed : EDGE_COLORS.inferred;
   ctx.fill();
 
-  // Edge label
-  if (edge.label) {
-    ctx.fillStyle = '#4a5568';
-    ctx.font = `${10 / scale}px Inter, sans-serif`;
+  // Edge label if visible
+  if (showLabels && edge.label) {
+    ctx.fillStyle = isConfirmed ? '#8892a4' : '#64748b';
+    ctx.font = `${9 / scale}px 'JetBrains Mono', monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(edge.label, mx, my - 5);
+    ctx.fillText(edge.label, mx, my - 6);
   }
 }
 
 function drawNode(node) {
   const colors = NODE_COLORS[node.type] || NODE_COLORS.ip;
-  const color = node.is_suspicious ? colors.suspicious : colors.normal;
+  const isSelected = selectedNode === node;
   const isHovered = hoveredNode === node;
-  const radius = isHovered ? 22 : 18;
+  const baseColor = node.is_suspicious ? colors.suspicious : colors.normal;
+  const radius = isSelected ? 24 : (isHovered ? 21 : 18);
 
-  // Glow for suspicious
+  // Threat glow
   if (node.is_suspicious) {
     ctx.beginPath();
+    ctx.arc(node.x, node.y, radius + 10, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(node.x, node.y, radius, node.x, node.y, radius + 10);
+    grad.addColorStop(0, 'rgba(255,71,87,0.4)');
+    grad.addColorStop(1, 'rgba(255,71,87,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+  } else if (isSelected) {
+    ctx.beginPath();
     ctx.arc(node.x, node.y, radius + 8, 0, Math.PI * 2);
-    const gradient = ctx.createRadialGradient(node.x, node.y, radius, node.x, node.y, radius + 8);
-    gradient.addColorStop(0, 'rgba(255,71,87,0.3)');
-    gradient.addColorStop(1, 'rgba(255,71,87,0)');
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = 'rgba(0,212,255,0.3)';
     ctx.fill();
   }
 
-  // Node circle
+  // Draw node body
   ctx.beginPath();
-  ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = color;
+  if (node.type === 'sys') {
+    // Diamond
+    ctx.moveTo(node.x, node.y - radius);
+    ctx.lineTo(node.x + radius, node.y);
+    ctx.lineTo(node.x, node.y + radius);
+    ctx.lineTo(node.x - radius, node.y);
+    ctx.closePath();
+  } else {
+    // Circle
+    ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+  }
+
+  ctx.fillStyle = baseColor;
   ctx.fill();
-  ctx.strokeStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = isHovered ? 2 : 1;
+  ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? '#00d4ff' : 'rgba(255,255,255,0.25)');
+  ctx.lineWidth = isSelected ? 2.5 : 1.5;
   ctx.stroke();
 
-  // Node type icon
-  const icon = { ip: '🌐', user: '👤', event: '⚡' }[node.type] || '●';
+  // Glyph icon inside node
+  const glyph = { ip: '🌐', user: '👤', sys: '🖥️', event: '⚡' }[node.type] || '●';
   ctx.font = `${13 / scale}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(icon, node.x, node.y);
+  ctx.fillText(glyph, node.x, node.y);
 
-  // Label
-  ctx.font = `${10 / scale}px Inter, sans-serif`;
-  ctx.fillStyle = node.is_suspicious ? '#ff4757' : '#8892a4';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText(node.label?.substring(0, 15), node.x, node.y + radius + 4);
+  // Label text below node
+  if (showLabels && node.label) {
+    ctx.font = `${10 / scale}px 'JetBrains Mono', monospace`;
+    ctx.fillStyle = node.is_suspicious ? '#ff4757' : (isSelected ? '#00d4ff' : '#8892a4');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const displayLabel = node.label.length > 20 ? node.label.substring(0, 18) + '…' : node.label;
+    ctx.fillText(displayLabel, node.x, node.y + radius + 5);
+  }
 }
 
-function drawEmptyState(text) {
+function drawEmptyState(msg) {
   if (!ctx || !canvas) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#0a0e1a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#4a5568';
+  ctx.fillStyle = '#8892a4';
   ctx.font = '14px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  ctx.fillText(msg, canvas.width / 2, canvas.height / 2);
 }
 
 function onMouseDown(e) {
@@ -220,11 +324,11 @@ function onMouseMove(e) {
   const mx = (e.clientX - rect.left - panX) / scale;
   const my = (e.clientY - rect.top - panY) / scale;
 
-  // Check hover
+  // Hover detection
   const prev = hoveredNode;
-  hoveredNode = graphData.nodes.find(n => {
+  hoveredNode = graphData.nodes?.find(n => {
     const dx = n.x - mx, dy = n.y - my;
-    return Math.sqrt(dx * dx + dy * dy) < 20;
+    return Math.sqrt(dx * dx + dy * dy) <= 22;
   }) || null;
 
   canvas.style.cursor = hoveredNode ? 'pointer' : (isPanning ? 'grabbing' : 'grab');
@@ -239,6 +343,26 @@ function onMouseMove(e) {
   }
 }
 
+function onMouseUp(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left - panX) / scale;
+  const my = (e.clientY - rect.top - panY) / scale;
+
+  // Check if click on a node
+  const clicked = graphData.nodes?.find(n => {
+    const dx = n.x - mx, dy = n.y - my;
+    return Math.sqrt(dx * dx + dy * dy) <= 22;
+  });
+
+  if (clicked) {
+    selectedNode = clicked;
+    updateInspectorPanel(selectedNode);
+    drawGraph();
+  }
+
+  isPanning = false;
+}
+
 function onWheel(e) {
   e.preventDefault();
   const delta = e.deltaY > 0 ? 0.9 : 1.1;
@@ -246,10 +370,34 @@ function onWheel(e) {
   drawGraph();
 }
 
-function zoomIn() { scale = Math.min(3, scale * 1.2); drawGraph(); }
-function zoomOut() { scale = Math.max(0.3, scale / 1.2); drawGraph(); }
-function resetView() { scale = 1; panX = 0; panY = 0; drawGraph(); }
-function setEl(id, val) {
+function updateInspectorPanel(node) {
+  const emptyPanel = document.getElementById('nodeInfoEmpty');
+  const contentPanel = document.getElementById('nodeInfoContent');
+
+  if (!node) {
+    if (emptyPanel) emptyPanel.style.display = 'block';
+    if (contentPanel) contentPanel.style.display = 'none';
+    return;
+  }
+
+  if (emptyPanel) emptyPanel.style.display = 'none';
+  if (contentPanel) contentPanel.style.display = 'block';
+
+  setElementText('infoEntityTypeBadge', (node.type || 'ENTITY').toUpperCase());
+  setElementText('infoEntityLabel', node.label || 'Unknown');
+  setElementText('infoNodeType', node.type?.toUpperCase() || '—');
+  setElementText('infoNodeThreat', node.is_suspicious ? 'Critical Threat Risk' : 'Normal / Monitored');
+  setElementText('infoNodeFirstSeen', node.first_seen || '—');
+  setElementText('infoNodeDegree', `${node.degree || 1} Connected Vertices`);
+  setElementText('infoNodeDescription', node.description || 'Observed entity in telemetry correlation graph.');
+
+  const threatEl = document.getElementById('infoNodeThreat');
+  if (threatEl) {
+    threatEl.className = 'e-val ' + (node.is_suspicious ? 'text-red' : 'text-cyan');
+  }
+}
+
+function setElementText(id, text) {
   const el = document.getElementById(id);
-  if (el) el.textContent = val;
+  if (el) el.textContent = text;
 }
