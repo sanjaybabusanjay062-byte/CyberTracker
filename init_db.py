@@ -254,7 +254,7 @@ def seed_database(csv_path, json_path, txt_path):
 
         # Brute force failed logins from suspicious IP
         for i in range(12):
-            ts = base.replace(hour=2, minute=15, second=i * 7)
+            ts = base.replace(hour=2, minute=15) + timedelta(seconds=i * 4)
             usernames = ['admin', 'root', 'jsmith', 'mdavis', 'lstewart', 'admin_user', 'sysadmin', 'operator', 'sa', 'guest', 'test', 'backup']
             log_entries.append(LogRecord(
                 evidence_id=ev1.id, case_id=case1.id,
