@@ -112,17 +112,10 @@ async function loadThreatSeverityChart() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '72%',
+        cutout: '70%',
         plugins: {
           legend: {
-            position: 'bottom',
-            labels: {
-              color: '#8892a4',
-              font: { size: 11, family: 'Inter' },
-              padding: 12,
-              boxWidth: 10,
-              boxHeight: 10
-            }
+            display: false // Custom legend placed neatly below the chart in #donutLegend
           },
           tooltip: {
             backgroundColor: '#162032',
@@ -136,12 +129,12 @@ async function loadThreatSeverityChart() {
       }
     });
 
-    // Custom legend if present
+    // Custom legend placed cleanly below the chart (Requirement 5)
     const legendEl = document.getElementById('donutLegend');
     if (legendEl && data.labels) {
       legendEl.innerHTML = data.labels.map((label, idx) => `
-        <div class="legend-item" style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:#8892a4;">
-          <span style="width:8px;height:8px;border-radius:50%;background:${data.colors[idx]}"></span>
+        <div class="legend-item" style="display:inline-flex;align-items:center;gap:6px;font-size:0.8rem;color:#8892a4;">
+          <span style="width:10px;height:10px;border-radius:50%;background:${data.colors[idx]};flex-shrink:0;"></span>
           <span>${label}: <strong style="color:#e8f0fe">${data.data[idx]}</strong></span>
         </div>
       `).join('');

@@ -162,4 +162,77 @@ document.addEventListener('DOMContentLoaded', () => {
       link.classList.add('active');
     }
   });
+
+  // ── Alerts Dropdown Toggle & Close-Outside (Requirement 1) ──
+  const notificationsBtn = document.getElementById('notificationsBtn');
+  const notificationPopover = document.getElementById('notificationPopover');
+
+  if (notificationsBtn && notificationPopover) {
+    notificationsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      notificationPopover.classList.toggle('show');
+    });
+
+    notificationPopover.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!notificationPopover.contains(e.target) && !notificationsBtn.contains(e.target)) {
+        notificationPopover.classList.remove('show');
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        notificationPopover.classList.remove('show');
+      }
+    });
+  }
+
+  // ── Mobile Sidebar Toggle & Responsive Navigation (Requirement 6) ──
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+  const sidebar = document.getElementById('sidebar');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+  function openSidebar() {
+    if (sidebar) sidebar.classList.add('open');
+    if (sidebarBackdrop) sidebarBackdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeSidebar() {
+    if (sidebar) sidebar.classList.remove('open');
+    if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  if (mobileMenuBtn && sidebar) {
+    mobileMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (sidebar.classList.contains('open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', closeSidebar);
+    }
+
+    sidebar.querySelectorAll('.nav-link').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth <= 900) {
+          closeSidebar();
+        }
+      });
+    });
+
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 900) {
+        closeSidebar();
+      }
+    });
+  }
 });

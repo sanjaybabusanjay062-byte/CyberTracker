@@ -147,9 +147,6 @@
             <span class="breadcrumb-separator">/</span>
             <span class="breadcrumb-item current">{% block breadcrumb %}Dashboard{% endblock %}</span>
           </div>
-        </div>
-
-        <div class="topbar-center">
           <div class="global-search-box">
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"></circle>
@@ -214,10 +211,10 @@
             </div>
             <div class="user-meta">
               <span class="user-name" id="currentUserName">
-                {{ current_user.username if current_user and current_user.username is defined else 'Investigator' }}
+                {{ current_user.username if current_user and current_user.username is defined else 'admin' }}
               </span>
               <span class="user-role">
-                {{ current_user.role if current_user and current_user.role is defined else 'Lead Forensics' }}
+                {{ current_user.role if current_user and current_user.role is defined else 'Super Admin' }}
               </span>
             </div>
             <a href="{{ url_for('auth.logout') if 'auth.logout' in (url_map or {}) else '/auth/logout' }}" class="logout-link-btn" title="Sign Out">
@@ -265,6 +262,9 @@
         </div>
       </footer>
     </div>
+
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
   </div>
 
   <!-- Loading Overlay -->
