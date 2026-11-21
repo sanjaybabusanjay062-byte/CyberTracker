@@ -33,19 +33,19 @@ app = create_app()
 if is_vercel:
     with app.app_context():
         try:
+            db.create_all()
             from app.models import User
             # Quick check if tables exist and have users
             if User.query.count() == 0:
-                from init_db import create_sample_files, seed_database
-                csv_path, json_path, txt_path = create_sample_files()
-                seed_database(csv_path, json_path, txt_path)
-        except Exception:
-            try:
-                from init_db import create_sample_files, seed_database
-                csv_path, json_path, txt_path = create_sample_files()
-                seed_database(csv_path, json_path, txt_path)
-            except Exception as ex:
-                print(f"[Vercel Init] Auto-seeding skipped: {ex}")
+                base_db = os.path.join(BASE_DIR, 'cybertrace.db')
+                if os.path.exists(base_db):
+                    shutil.copyfile(base_db, tmp_db)
+                else:
+                    from init_db import create_sample_files, seed_database
+                    csv_path, json_path, txt_path = create_sample_files()
+                    seed_database(csv_path, json_path, txt_path)
+        except Exception as ex:
+            print(f"[Vercel Init] Auto-seeding skipped or failed: {ex}")
 
 # WSGI handler for Vercel
 if __name__ == '__main__':

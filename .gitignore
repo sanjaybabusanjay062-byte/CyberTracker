@@ -5,11 +5,11 @@ __pycache__/
 *.pyo
 *.pyd
 .env
-*.db
 *.sqlite3
-uploads/
-reports/
-sample_data/
+/uploads/
+/reports/
+/sample_data/
+/scratch/
 .DS_Store
 *.log
 dist/

@@ -33,7 +33,13 @@ SAMPLE_USERS_LOGS = [
 
 def create_sample_files():
     """Create the sample data directory and CSV/JSON/TXT files with recent timestamps."""
-    os.makedirs('sample_data', exist_ok=True)
+    is_vercel = bool(os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME'))
+    if is_vercel:
+        import tempfile
+        base_dir = os.path.join(tempfile.gettempdir(), 'sample_data')
+    else:
+        base_dir = 'sample_data'
+    os.makedirs(base_dir, exist_ok=True)
 
     # Dynamic base date: yesterday
     base = datetime.utcnow().replace(minute=0, second=0, microsecond=0) - timedelta(days=1)
@@ -42,7 +48,7 @@ def create_sample_files():
     mon_day = base.strftime('%b %d')
 
     # --- Sample Auth Log CSV ---
-    csv_path = 'sample_data/sample_auth_logs.csv'
+    csv_path = os.path.join(base_dir, 'sample_auth_logs.csv')
     with open(csv_path, 'w') as f:
         f.write('# SIMULATED DATA - For demonstration purposes only\n')
         f.write('timestamp,source_ip,username,event_type,status,user_agent,session_id\n')
@@ -84,7 +90,7 @@ def create_sample_files():
             f.write(','.join(str(r) for r in row) + '\n')
 
     # --- Sample System Events JSON ---
-    json_path = 'sample_data/sample_system_events.json'
+    json_path = os.path.join(base_dir, 'sample_system_events.json')
     with open(json_path, 'w') as f:
         import json
         events = [
@@ -106,7 +112,7 @@ def create_sample_files():
         json.dump(events, f, indent=2)
 
     # --- Sample Network Logs TXT ---
-    txt_path = 'sample_data/sample_network_logs.txt'
+    txt_path = os.path.join(base_dir, 'sample_network_logs.txt')
     with open(txt_path, 'w') as f:
         lines = [
             '# SIMULATED NETWORK LOGS - Demonstration data only',
